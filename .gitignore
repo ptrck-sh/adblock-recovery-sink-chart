@@ -1,0 +1,18 @@
+# helm
+charts/
+*.tgz
+Chart.lock
+
+# os
+.DS_Store
+Thumbs.db
+
+# editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# caches
+.cache/
