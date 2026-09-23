@@ -35,3 +35,21 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s:%s" .Values.image.repository $tag -}}
 {{- end -}}
 {{- end -}}
+
+{{- define "ars.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create -}}
+{{- default (include "ars.fullname" .) .Values.serviceAccount.name -}}
+{{- else -}}
+{{- default "default" .Values.serviceAccount.name -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "ars.sniMatch" -}}
+{{- range $index, $host := .Values.interception.hosts -}}
+{{- if $index }} || {{ end -}}HostSNI(`{{ $host }}`)
+{{- end -}}
+{{- end -}}
+
+{{- define "ars.enrollmentMatch" -}}
+Host(`{{ .Values.enrollment.host }}`) && (Path(`/install`) || Path(`/ca.crt`) || Path(`/ca.pem`) || Path(`/ca-chain.pem`) || Path(`/fingerprint`))
+{{- end -}}

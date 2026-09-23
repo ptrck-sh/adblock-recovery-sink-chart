@@ -1,0 +1,14 @@
+suite: ServiceMonitor API validation
+templates:
+  - templates/servicemonitor.yaml
+tests:
+  - it: fails an enabled ServiceMonitor without its API
+    set:
+      pki.existingSecret: pki
+      serviceMonitor.enabled: true
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - failedTemplate:
+          errorMessage: serviceMonitor.enabled=true requires the monitoring.coreos.com/v1 API

@@ -4,7 +4,25 @@
 
 Helm chart for [adblock-recovery-sink](https://gitlab.com/ptrck-sh/adblock-recovery-sink), which serves harmless replacements for known anti-adblock loader resources behind DNS rewrites that you manage on your LAN resolver.
 
-Scaffold only. No resources are rendered yet.
+The chart mounts no volumes. Application configuration is supplied only through environment variables.
+
+## Routing
+
+| Mode | Interception | Enrollment |
+| --- | --- | --- |
+| `traefik` | Traefik `IngressRouteTCP` with TLS passthrough | Traefik `IngressRoute` |
+| `gateway` | Gateway API `TLSRoute` | Gateway API `HTTPRoute` |
+| `ingress` | Expose the sink Service directly as `LoadBalancer` or `NodePort` | Standard Kubernetes `Ingress` |
+
+Enrollment routes are created only when `enrollment.host` is set. They expose only the enrollment paths.
+
+## PKI Secret
+
+Set `pki.existingSecret` to an externally managed Secret containing `root.crt`, `intermediate.crt`, and `intermediate.key` by default. Override those key names with `pki.keys`. The chart never creates this Secret. Its values are consumed as individual environment variables. Secret changes require an explicit Deployment rollout.
+
+## NetworkPolicy
+
+NetworkPolicy is enabled by default. It allows ingress from the configured routing peers and denies all egress, including DNS.
 
 {{ template "chart.valuesSection" . }}
 

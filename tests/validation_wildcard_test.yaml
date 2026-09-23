@@ -1,0 +1,15 @@
+suite: wildcard host validation
+templates:
+  - templates/configmap.yaml
+tests:
+  - it: fails for wildcard interception hosts
+    set:
+      pki.existingSecret: pki
+      interception.hosts:
+        - "*.example.com"
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - failedTemplate:
+          errorMessage: interception.hosts entry "*.example.com" must not contain a wildcard

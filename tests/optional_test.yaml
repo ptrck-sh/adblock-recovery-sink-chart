@@ -1,0 +1,196 @@
+suite: optional resources
+release:
+  name: rel
+  namespace: test
+tests:
+  - it: does not render a ServiceMonitor when disabled
+    templates:
+      - templates/servicemonitor.yaml
+    set:
+      pki.existingSecret: pki
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a ServiceMonitor when enabled
+    templates:
+      - templates/servicemonitor.yaml
+    set:
+      pki.existingSecret: pki
+      serviceMonitor.enabled: true
+      serviceMonitor.interval: 15s
+      serviceMonitor.labels:
+        team: ops
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+        - monitoring.coreos.com/v1
+    asserts:
+      - containsDocument:
+          kind: ServiceMonitor
+          apiVersion: monitoring.coreos.com/v1
+          name: rel-adblock-recovery-sink
+      - equal:
+          path: spec.endpoints[0].port
+          value: ops
+      - equal:
+          path: spec.endpoints[0].path
+          value: /metrics
+      - equal:
+          path: metadata.labels.team
+          value: ops
+
+  - it: does not render a Certificate when disabled
+    templates:
+      - templates/certificate.yaml
+    set:
+      pki.existingSecret: pki
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a Certificate when enabled
+    templates:
+      - templates/certificate.yaml
+    set:
+      pki.existingSecret: pki
+      enrollment.host: enroll.example.com
+      enrollment.tls.secretName: enrollment-tls
+      certificate.enabled: true
+      certificate.issuerRef:
+        name: issuer
+        kind: ClusterIssuer
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+        - cert-manager.io/v1
+    asserts:
+      - containsDocument:
+          kind: Certificate
+          apiVersion: cert-manager.io/v1
+          name: rel-adblock-recovery-sink-enrollment
+      - equal:
+          path: spec.secretName
+          value: enrollment-tls
+      - equal:
+          path: spec.issuerRef.name
+          value: issuer
+
+  - it: does not render a VPA when disabled
+    templates:
+      - templates/vpa.yaml
+    set:
+      pki.existingSecret: pki
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a VPA when enabled
+    templates:
+      - templates/vpa.yaml
+    set:
+      pki.existingSecret: pki
+      vpa.enabled: true
+      vpa.updateMode: Initial
+      vpa.minAllowed:
+        cpu: 10m
+      vpa.maxAllowed:
+        memory: 128Mi
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+        - autoscaling.k8s.io/v1
+    asserts:
+      - containsDocument:
+          kind: VerticalPodAutoscaler
+          apiVersion: autoscaling.k8s.io/v1
+          name: rel-adblock-recovery-sink
+      - equal:
+          path: spec.updatePolicy.updateMode
+          value: Initial
+      - equal:
+          path: spec.resourcePolicy.containerPolicies[0].minAllowed.cpu
+          value: 10m
+
+  - it: does not render a PDB when disabled
+    templates:
+      - templates/pdb.yaml
+    set:
+      pki.existingSecret: pki
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a PDB when enabled
+    templates:
+      - templates/pdb.yaml
+    set:
+      pki.existingSecret: pki
+      pdb.enabled: true
+      pdb.minAvailable: 1
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - containsDocument:
+          kind: PodDisruptionBudget
+          apiVersion: policy/v1
+          name: rel-adblock-recovery-sink
+      - equal:
+          path: spec.minAvailable
+          value: 1
+
+  - it: does not render an HPA when disabled
+    templates:
+      - templates/hpa.yaml
+    set:
+      pki.existingSecret: pki
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders an HPA when enabled
+    templates:
+      - templates/hpa.yaml
+    set:
+      pki.existingSecret: pki
+      hpa.enabled: true
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - containsDocument:
+          kind: HorizontalPodAutoscaler
+          apiVersion: autoscaling/v2
+          name: rel-adblock-recovery-sink
+      - equal:
+          path: spec.maxReplicas
+          value: 3
+
+  - it: omits Deployment replicas when HPA is enabled
+    templates:
+      - templates/deployment.yaml
+    set:
+      pki.existingSecret: pki
+      hpa.enabled: true
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - notExists:
+          path: spec.replicas

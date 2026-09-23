@@ -1,0 +1,16 @@
+{{- include "ars.validate" . -}}
+{{- if .Values.certificate.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "ars.fullname" . }}-enrollment
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "ars.labels" . | nindent 4 }}
+spec:
+  secretName: {{ .Values.enrollment.tls.secretName | quote }}
+  issuerRef:
+    {{- toYaml .Values.certificate.issuerRef | nindent 4 }}
+  dnsNames:
+    - {{ .Values.enrollment.host | quote }}
+{{- end }}

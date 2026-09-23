@@ -1,0 +1,14 @@
+suite: empty host validation
+templates:
+  - templates/configmap.yaml
+tests:
+  - it: fails for empty interception hosts
+    set:
+      pki.existingSecret: pki
+      interception.hosts: []
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - failedTemplate:
+          errorMessage: interception.hosts must contain at least one hostname

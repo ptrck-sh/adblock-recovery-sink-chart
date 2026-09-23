@@ -1,0 +1,99 @@
+suite: routing
+release:
+  name: rel
+  namespace: test
+tests:
+  - it: renders the default Traefik TLS passthrough route without a catch-all
+    templates:
+      - templates/routing.yaml
+    set:
+      pki.existingSecret: pki
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - containsDocument:
+          kind: IngressRouteTCP
+          apiVersion: traefik.io/v1alpha1
+          name: rel-adblock-recovery-sink-sink
+      - equal:
+          path: spec.routes[0].match
+          value: HostSNI(`html-load.com`)
+      - equal:
+          path: spec.tls.passthrough
+          value: true
+      - notMatchRegex:
+          path: spec.routes[0].match
+          pattern: "\\*"
+
+  - it: renders the Traefik enrollment route with only enrollment paths
+    templates:
+      - templates/routing.yaml
+    set:
+      pki.existingSecret: pki
+      enrollment.host: enroll.example.com
+      enrollment.tls.secretName: enrollment-tls
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: spec.routes[0].match
+          value: Host(`enroll.example.com`) && (Path(`/install`) || Path(`/ca.crt`) || Path(`/ca.pem`) || Path(`/ca-chain.pem`) || Path(`/fingerprint`))
+        documentIndex: 1
+      - equal:
+          path: spec.tls.secretName
+          value: enrollment-tls
+        documentIndex: 1
+
+  - it: renders Gateway API routes
+    templates:
+      - templates/routing.yaml
+    set:
+      pki.existingSecret: pki
+      routing.mode: gateway
+      routing.gateway.tlsParentRefs:
+        - name: shared-gateway
+          sectionName: tls
+      routing.gateway.httpParentRefs:
+        - name: shared-gateway
+          sectionName: https
+      enrollment.host: enroll.example.com
+    capabilities:
+      apiVersions:
+        - gateway.networking.k8s.io/v1alpha2/TLSRoute
+        - gateway.networking.k8s.io/v1/HTTPRoute
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: spec.hostnames[0]
+          value: html-load.com
+        documentIndex: 0
+      - equal:
+          path: spec.rules[4].matches[0].path.value
+          value: /fingerprint
+        documentIndex: 1
+
+  - it: renders enrollment Ingress mode with a LoadBalancer sink
+    templates:
+      - templates/routing.yaml
+    set:
+      pki.existingSecret: pki
+      routing.mode: ingress
+      service.sink.type: LoadBalancer
+      enrollment.host: enroll.example.com
+      enrollment.tls.secretName: enrollment-tls
+    asserts:
+      - containsDocument:
+          kind: Ingress
+          apiVersion: networking.k8s.io/v1
+          name: rel-adblock-recovery-sink-enrollment
+      - equal:
+          path: spec.rules[0].http.paths[0].pathType
+          value: Exact
+      - equal:
+          path: spec.rules[0].http.paths[4].path
+          value: /fingerprint

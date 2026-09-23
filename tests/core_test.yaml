@@ -1,0 +1,115 @@
+suite: core resources and validation
+release:
+  name: rel
+  namespace: test
+tests:
+  - it: wires the PKI keys as individual Secret references
+    templates:
+      - templates/deployment.yaml
+    set:
+      pki.existingSecret: pki
+      pki.keys.rootCert: ca-root
+      pki.keys.intermediateCert: ca-intermediate
+      pki.keys.intermediateKey: issuer-key
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[0].valueFrom.secretKeyRef.name
+          value: pki
+      - equal:
+          path: spec.template.spec.containers[0].env[0].valueFrom.secretKeyRef.key
+          value: ca-root
+      - equal:
+          path: spec.template.spec.containers[0].env[1].valueFrom.secretKeyRef.key
+          value: ca-intermediate
+      - equal:
+          path: spec.template.spec.containers[0].env[2].valueFrom.secretKeyRef.key
+          value: issuer-key
+
+  - it: renders the app environment ConfigMap
+    templates:
+      - templates/configmap.yaml
+    set:
+      pki.existingSecret: pki
+      interception.hosts:
+        - html-load.com
+        - assets.example.net
+      profiles:
+        - adshield
+        - fallback
+      enrollment.host: enroll.example.com
+      logLevel: debug
+      logFormat: text
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - equal:
+          path: data.ARS_SINK_ADDR
+          value: ":8443"
+      - equal:
+          path: data.ARS_OPS_ADDR
+          value: ":8080"
+      - equal:
+          path: data.ARS_HOSTS
+          value: html-load.com,assets.example.net
+      - equal:
+          path: data.ARS_PROFILES
+          value: adshield,fallback
+      - equal:
+          path: data.ARS_ENROLLMENT_HOST
+          value: enroll.example.com
+      - equal:
+          path: data.ARS_LOG_LEVEL
+          value: debug
+
+  - it: renders a hardened volume-free pod
+    templates:
+      - templates/deployment.yaml
+    set:
+      pki.existingSecret: pki
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 65532
+      - equal:
+          path: spec.template.spec.securityContext.seccompProfile.type
+          value: RuntimeDefault
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - contains:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          content: ALL
+      - notExists:
+          path: spec.template.spec.volumes
+
+  - it: denies all egress by default
+    templates:
+      - templates/networkpolicy.yaml
+    set:
+      pki.existingSecret: pki
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - equal:
+          path: spec.egress
+          value: []
+      - contains:
+          path: spec.policyTypes
+          content: Egress

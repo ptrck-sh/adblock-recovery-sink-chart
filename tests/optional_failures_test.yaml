@@ -1,0 +1,17 @@
+suite: optional resource failures
+templates:
+  - templates/hpa.yaml
+tests:
+  - it: fails active HPA and VPA together
+    set:
+      pki.existingSecret: pki
+      hpa.enabled: true
+      vpa.enabled: true
+      vpa.updateMode: Auto
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+        - autoscaling.k8s.io/v1
+    asserts:
+      - failedTemplate:
+          errorMessage: hpa.enabled and vpa.enabled require vpa.updateMode to be Off
