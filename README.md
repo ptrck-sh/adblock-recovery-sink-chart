@@ -74,6 +74,7 @@ NetworkPolicy is enabled by default. It allows ingress from the configured routi
 | routing.ingress.annotations | object | `{}` |  |
 | routing.ingress.className | string | `""` |  |
 | routing.mode | string | `"traefik"` |  |
+| routing.traefik.annotations | object | `{}` |  |
 | routing.traefik.entryPoints[0] | string | `"websecure"` |  |
 | securityContext.allowPrivilegeEscalation | bool | `false` |  |
 | securityContext.capabilities.drop[0] | string | `"ALL"` |  |

@@ -79,6 +79,7 @@ routing:
   traefik:
     entryPoints:
       - websecure
+    annotations: {}
   gateway:
     tlsParentRefs: []
     httpParentRefs: []
