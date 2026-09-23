@@ -1,0 +1,98 @@
+stages:
+  - lint
+  - test
+  - publish
+include:
+  - component: $CI_SERVER_FQDN/ptrck-sh/templates/ci-templates/base@0.23.0
+    inputs:
+      runner_tags:
+        - homelab
+  - component: $CI_SERVER_FQDN/ptrck-sh/templates/ci-templates/pre-commit@0.23.0
+  - component: $CI_SERVER_FQDN/ptrck-sh/templates/ci-templates/security@0.23.0
+  - component: $CI_SERVER_FQDN/ptrck-sh/templates/ci-templates/alint-fix@0.23.0
+  - component: $CI_SERVER_FQDN/ptrck-sh/templates/ci-templates/helm@0.23.0
+    inputs:
+      image: alpine/helm:3.21.2
+
+helm:publish:
+  before_script:
+    - apk add --no-cache curl
+
+init:helm:
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+      when: never
+    - if: $CI_COMMIT_BRANCH
+
+helm:lint:
+  stage: lint
+  image:
+    name: alpine/helm:4.3.0
+    entrypoint: [""]
+  script:
+    - helm lint .
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH
+
+helm:unittest:
+  stage: test
+  image:
+    name: alpine/helm:4.3.0
+    entrypoint: [""]
+  before_script:
+    - apk add --no-cache git
+  script:
+    - helm plugin install --verify=false https://github.com/helm-unittest/helm-unittest
+    - helm unittest .
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH
+
+helm:verify-image:
+  stage: test
+  image:
+    name: alpine/helm:4.3.0
+    entrypoint: [""]
+  before_script:
+    - apk add --no-cache curl jq
+  script:
+    - |
+      IMAGE="$(helm template image-check . | awk '/^          image: / {gsub(/"/, "", $2); print $2; exit}')"
+      case "$IMAGE" in
+        registry.gitlab.com/ptrck-sh/adblock-recovery-sink@sha256:*)
+          REFERENCE="${IMAGE#*@}"
+          REFERENCE_TYPE=digest
+          ;;
+        registry.gitlab.com/ptrck-sh/adblock-recovery-sink:*)
+          REFERENCE="${IMAGE##*:}"
+          REFERENCE_TYPE=tag
+          ;;
+        *)
+          echo "unexpected resolved image: $IMAGE"
+          exit 1
+          ;;
+      esac
+      REPOSITORY_ID="$(curl --fail --silent --show-error --header "JOB-TOKEN: $CI_JOB_TOKEN" "$CI_API_V4_URL/projects/ptrck-sh%2Fadblock-recovery-sink/registry/repositories" | jq --raw-output '.[] | select(.location == "registry.gitlab.com/ptrck-sh/adblock-recovery-sink") | .id')"
+      test -n "$REPOSITORY_ID"
+      test "$REPOSITORY_ID" != null
+      if [ "$REFERENCE_TYPE" = digest ]; then
+        for TAG in $(curl --fail --silent --show-error --header "JOB-TOKEN: $CI_JOB_TOKEN" "$CI_API_V4_URL/projects/ptrck-sh%2Fadblock-recovery-sink/registry/repositories/$REPOSITORY_ID/tags" | jq --raw-output '.[].name'); do
+          ENCODED_TAG="$(jq --null-input --raw-output --arg tag "$TAG" '$tag | @uri')"
+          DIGEST="$(curl --fail --silent --show-error --header "JOB-TOKEN: $CI_JOB_TOKEN" "$CI_API_V4_URL/projects/ptrck-sh%2Fadblock-recovery-sink/registry/repositories/$REPOSITORY_ID/tags/$ENCODED_TAG" | jq --raw-output '.digest')"
+          if [ "$DIGEST" = "$REFERENCE" ]; then
+            exit 0
+          fi
+        done
+        echo "image digest does not exist: $IMAGE"
+        exit 1
+      fi
+      ENCODED_REFERENCE="$(jq --null-input --raw-output --arg reference "$REFERENCE" '$reference | @uri')"
+      curl --fail --silent --show-error --header "JOB-TOKEN: $CI_JOB_TOKEN" "$CI_API_V4_URL/projects/ptrck-sh%2Fadblock-recovery-sink/registry/repositories/$REPOSITORY_ID/tags/$ENCODED_REFERENCE" > /dev/null
+  rules:
+    - if: $CI_COMMIT_TAG

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":configMigration",
+    ":pinDevDependencies",
+    "abandonments:recommended",
+    ":disableDependencyDashboard",
+    "gitlab>ptrck-sh/templates/renovate-config",
+    "gitlab>ptrck-sh/templates/renovate-config//presets/helm"
+  ],
+  "reviewersFromCodeOwners": true
+}

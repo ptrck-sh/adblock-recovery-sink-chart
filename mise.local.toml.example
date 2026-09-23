@@ -1,0 +1,2 @@
+[env]
+# Machine/developer-specific variables. Copy to mise.local.toml (git-ignored).
