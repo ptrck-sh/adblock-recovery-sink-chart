@@ -128,7 +128,7 @@ Set `pki.existingSecret` to an externally managed Secret containing `root.crt`, 
 
 ## NetworkPolicy
 
-NetworkPolicy is enabled by default. It allows ingress on the sink and ops ports from any source unless `networkPolicy.ingressFrom` is configured, and denies all egress, including DNS.
+NetworkPolicy is enabled by default. It allows ingress on the sink and ops ports from any source unless `networkPolicy.ingressFrom` is configured, and denies all egress, including DNS. `networkPolicy.metricsFrom` adds peers to the ops port only when `ingressFrom` is set, because the ops port also serves the public web routes; with an empty `ingressFrom` both ports already accept any source.
 
 {{ template "chart.valuesSection" . }}
 

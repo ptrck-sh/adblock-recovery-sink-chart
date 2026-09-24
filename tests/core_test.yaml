@@ -276,6 +276,27 @@ tests:
           path: spec.ingress[1].from[1].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
           value: monitoring
 
+  - it: keeps both ports open when only metrics peers are configured
+    templates:
+      - templates/networkpolicy.yaml
+    set:
+      pki.existingSecret: pki
+      networkPolicy.metricsFrom:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - notExists:
+          path: spec.ingress[0].from
+      - notExists:
+          path: spec.ingress[1].from
+      - equal:
+          path: spec.egress
+          value: []
+
   - it: renders deployment runtime configuration
     templates:
       - templates/deployment.yaml
