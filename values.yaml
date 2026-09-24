@@ -55,6 +55,13 @@ toast:
   enabled: false
   details: false
 
+metrics:
+  sites:
+    enabled: false
+    max: 100
+  upstreams:
+    max: 200
+
 logLevel: info
 logFormat: json
 

@@ -16,6 +16,12 @@ The chart mounts no volumes. Application configuration is supplied only through 
 
 `toast.enabled` appends a small notice to each served loader that appears in the top-right corner when the sink answers the page's handshake. `toast.details` adds the host and path of the neutralized script. Both default to `false`.
 
+## Metrics
+
+`ars_upstream_requests_total` counts every request by requested host, path, and result, so fallback hosts and loader names the profile does not serve yet show up. `metrics.upstreams.max` caps the distinct host and path pairs per pod; the rest are counted as `other`.
+
+`metrics.sites.enabled` adds `ars_site_requests_total`, which counts served loaders by the site in the request's `Referer`. It records which sites your users visit, so it defaults to `false`. `metrics.sites.max` caps the distinct sites per pod.
+
 ## Routing
 
 TLS interception and the public web hostname are configured separately. The sink listens on TLS port 443; the plain HTTP ops listener is port 8443. The chart sets `net.ipv4.ip_unprivileged_port_start` to the lowest container port below 1024 so the non-root container can bind it. Additional pod sysctls can be set with `podSecurityContext.sysctls`.
@@ -180,6 +186,9 @@ NetworkPolicy is enabled by default. It allows ingress on the sink and ops ports
 | livenessProbe.httpGet.port | string | `"ops"` |  |
 | logFormat | string | `"json"` |  |
 | logLevel | string | `"info"` |  |
+| metrics.sites.enabled | bool | `false` |  |
+| metrics.sites.max | int | `100` |  |
+| metrics.upstreams.max | int | `200` |  |
 | nameOverride | string | `""` |  |
 | networkPolicy.enabled | bool | `true` |  |
 | networkPolicy.ingressFrom | list | `[]` |  |
