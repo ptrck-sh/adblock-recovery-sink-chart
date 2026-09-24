@@ -4,7 +4,7 @@
 # For machine/developer-specific vars, copy mise.local.toml.example to mise.local.toml.
 
 [tools]
-pre-commit = "4.6.1"
+pre-commit = "4.6.2"
 glab = "1.100.0"
 
 [hooks]
