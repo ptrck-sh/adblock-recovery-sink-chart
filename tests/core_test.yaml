@@ -42,6 +42,8 @@ tests:
       hostname: status.example.com
       logLevel: debug
       logFormat: text
+      toast.enabled: true
+      toast.details: true
     capabilities:
       apiVersions:
         - traefik.io/v1alpha1
@@ -64,6 +66,12 @@ tests:
       - equal:
           path: data.ARS_LOG_LEVEL
           value: debug
+      - equal:
+          path: data.ARS_TOAST_ENABLED
+          value: "true"
+      - equal:
+          path: data.ARS_TOAST_DETAILS
+          value: "true"
 
   - it: renders configured addresses in the ConfigMap
     templates:

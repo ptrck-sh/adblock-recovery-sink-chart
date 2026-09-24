@@ -8,6 +8,14 @@ Setup, PKI and enrollment, DNS rewrites, Chrome Local Network Access and trouble
 
 The chart mounts no volumes. Application configuration is supplied only through environment variables.
 
+## Intercepted hosts
+
+`interception.hosts` lists every known Ad-Shield loader host. It drives the passthrough routes and `ARS_HOSTS`. The sink serves only the hosts its CA name constraints permit and logs the rest as skipped, so a CA created for `html-load.com` alone keeps working and covers `html-load.com` and its subdomains. Create a CA for all loader domains to cover the full list, and add a DNS rewrite for each host you want intercepted.
+
+## Toast
+
+`toast.enabled` appends a small notice to each served loader that appears in the top-right corner when the sink answers the page's handshake. `toast.details` adds the host and path of the neutralized script. Both default to `false`.
+
 ## Routing
 
 TLS interception and the public web hostname are configured separately. The sink listens on TLS port 443; the plain HTTP ops listener is port 8443. The chart sets `net.ipv4.ip_unprivileged_port_start` to the lowest container port below 1024 so the non-root container can bind it. Additional pod sysctls can be set with `podSecurityContext.sysctls`.
@@ -159,6 +167,17 @@ NetworkPolicy is enabled by default. It allows ingress on the sink and ops ports
 | ingress.passthrough.enabled | bool | `false` |  |
 | ingress.tls | list | `[]` |  |
 | interception.hosts[0] | string | `"html-load.com"` |  |
+| interception.hosts[10] | string | `"css-load.com"` |  |
+| interception.hosts[11] | string | `"d37j8pfxu2iogi.cloudfront.net"` |  |
+| interception.hosts[1] | string | `"fb.html-load.com"` |  |
+| interception.hosts[2] | string | `"1.s.html-load.com"` |  |
+| interception.hosts[3] | string | `"3.s.html-load.com"` |  |
+| interception.hosts[4] | string | `"8.s.html-load.com"` |  |
+| interception.hosts[5] | string | `"content-loader.com"` |  |
+| interception.hosts[6] | string | `"fb.content-loader.com"` |  |
+| interception.hosts[7] | string | `"1.content-loader.com"` |  |
+| interception.hosts[8] | string | `"2.content-loader.com"` |  |
+| interception.hosts[9] | string | `"js-loader.com"` |  |
 | livenessProbe.httpGet.path | string | `"/healthz"` |  |
 | livenessProbe.httpGet.port | string | `"ops"` |  |
 | logFormat | string | `"json"` |  |
@@ -210,6 +229,8 @@ NetworkPolicy is enabled by default. It allows ingress on the sink and ops ports
 | serviceMonitor.labels | object | `{}` |  |
 | strategy | object | `{}` |  |
 | terminationGracePeriodSeconds | int | `30` |  |
+| toast.details | bool | `false` |  |
+| toast.enabled | bool | `false` |  |
 | tolerations | list | `[]` |  |
 | topologySpreadConstraints | list | `[]` |  |
 | vpa.enabled | bool | `false` |  |
