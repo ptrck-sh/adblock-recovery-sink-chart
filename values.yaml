@@ -11,17 +11,34 @@ replicaCount: 1
 
 imagePullSecrets: []
 
+hostname: ""
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts: []
+  tls: []
+
+gateway:
+  enabled: false
+  annotations: {}
+  httpRoute:
+    parentRefs: []
+  tlsRoute:
+    parentRefs: []
+
 interception:
   hosts:
     - html-load.com
+  traefik:
+    enabled: true
+    entryPoints:
+      - websecure
+    annotations: {}
 
 profiles:
   - adshield
-
-enrollment:
-  host: ""
-  tls:
-    secretName: ""
 
 logLevel: info
 logFormat: json
@@ -102,21 +119,6 @@ service:
     annotations: {}
     labels: {}
 
-routing:
-  mode: traefik
-  traefik:
-    entryPoints:
-      - websecure
-    enrollmentEntryPoints: []
-    certResolver: ""
-    annotations: {}
-  gateway:
-    tlsParentRefs: []
-    httpParentRefs: []
-  ingress:
-    className: ""
-    annotations: {}
-
 networkPolicy:
   enabled: true
   ingressFrom: []
@@ -129,6 +131,7 @@ serviceMonitor:
 
 certificate:
   enabled: false
+  secretName: ""
   issuerRef: {}
 
 vpa:

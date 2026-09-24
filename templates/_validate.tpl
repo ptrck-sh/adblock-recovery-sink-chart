@@ -1,3 +1,25 @@
+{{- define "ars.validateHostname" -}}
+{{- $host := . -}}
+{{- if not $host -}}
+{{- fail "hostname must be a non-empty lowercase hostname" -}}
+{{- end -}}
+{{- if contains "*" $host -}}
+{{- fail (printf "hostname %q must not contain a wildcard" $host) -}}
+{{- end -}}
+{{- if hasPrefix "." $host -}}
+{{- fail (printf "hostname %q must not begin with a dot" $host) -}}
+{{- end -}}
+{{- if not (contains "." $host) -}}
+{{- fail (printf "hostname %q must contain a dot" $host) -}}
+{{- end -}}
+{{- if ne $host (lower $host) -}}
+{{- fail (printf "hostname %q must be lowercase" $host) -}}
+{{- end -}}
+{{- if not (regexMatch "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$" $host) -}}
+{{- fail (printf "hostname %q must be an exact hostname" $host) -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "ars.validate" -}}
 {{- if not .Values.interception.hosts -}}
 {{- fail "interception.hosts must contain at least one hostname" -}}
@@ -22,8 +44,17 @@
 {{- fail (printf "interception.hosts entry %q must be an exact hostname" $host) -}}
 {{- end -}}
 {{- end -}}
-{{- if not (has .Values.routing.mode (list "traefik" "gateway" "ingress")) -}}
-{{- fail "routing.mode must be one of traefik, gateway, or ingress" -}}
+{{- if .Values.hostname -}}
+{{- include "ars.validateHostname" .Values.hostname -}}
+{{- end -}}
+{{- if and .Values.ingress.enabled (not .Values.ingress.hosts) (not .Values.hostname) -}}
+{{- fail "ingress.enabled=true requires ingress.hosts or hostname" -}}
+{{- end -}}
+{{- range $entry := .Values.ingress.hosts -}}
+{{- include "ars.validateHostname" $entry.host -}}
+{{- end -}}
+{{- if and .Values.gateway.enabled .Values.gateway.httpRoute.parentRefs (not .Values.hostname) -}}
+{{- fail "gateway.httpRoute.parentRefs requires hostname" -}}
 {{- end -}}
 {{- $_ := required "pki.existingSecret must name an externally managed Secret" .Values.pki.existingSecret -}}
 {{- range .Values.extraEnv -}}
@@ -31,33 +62,23 @@
 {{- fail "extraEnv entries must not use names beginning with ARS_PKI_" -}}
 {{- end -}}
 {{- end -}}
-{{- if eq .Values.routing.mode "traefik" -}}
+{{- if .Values.interception.traefik.enabled -}}
 {{- if not (.Capabilities.APIVersions.Has "traefik.io/v1alpha1") -}}
-{{- fail "routing.mode=traefik requires the traefik.io/v1alpha1 API" -}}
+{{- fail "interception.traefik.enabled=true requires the traefik.io/v1alpha1 API" -}}
 {{- end -}}
 {{- end -}}
-{{- if eq .Values.routing.mode "gateway" -}}
-{{- if not .Values.routing.gateway.tlsParentRefs -}}
-{{- fail "routing.gateway.tlsParentRefs must not be empty when routing.mode=gateway" -}}
-{{- end -}}
-{{- if .Values.enrollment.host }}
-{{- if not .Values.routing.gateway.httpParentRefs -}}
-{{- fail "routing.gateway.httpParentRefs must not be empty when enrollment.host is set in gateway mode" -}}
-{{- end -}}
-{{- end -}}
+{{- if and .Values.gateway.enabled .Values.gateway.tlsRoute.parentRefs -}}
 {{- if not (.Capabilities.APIVersions.Has "gateway.networking.k8s.io/v1alpha2/TLSRoute") -}}
-{{- fail "routing.mode=gateway requires the gateway.networking.k8s.io/v1alpha2/TLSRoute API" -}}
+{{- fail "gateway.tlsRoute.parentRefs requires the gateway.networking.k8s.io/v1alpha2/TLSRoute API" -}}
 {{- end -}}
-{{- if .Values.enrollment.host }}
+{{- end -}}
+{{- if and .Values.gateway.enabled .Values.gateway.httpRoute.parentRefs -}}
 {{- if not (.Capabilities.APIVersions.Has "gateway.networking.k8s.io/v1/HTTPRoute") -}}
-{{- fail "routing.mode=gateway with enrollment.host requires the gateway.networking.k8s.io/v1/HTTPRoute API" -}}
+{{- fail "gateway.httpRoute.parentRefs requires the gateway.networking.k8s.io/v1/HTTPRoute API" -}}
 {{- end -}}
 {{- end -}}
-{{- end -}}
-{{- if eq .Values.routing.mode "ingress" -}}
-{{- if not (has .Values.service.sink.type (list "LoadBalancer" "NodePort")) -}}
-{{- fail "routing.mode=ingress requires service.sink.type to be LoadBalancer or NodePort because standard Ingress cannot pass TLS through" -}}
-{{- end -}}
+{{- if not (or .Values.interception.traefik.enabled (and .Values.gateway.enabled .Values.gateway.tlsRoute.parentRefs) (has .Values.service.sink.type (list "LoadBalancer" "NodePort"))) -}}
+{{- fail "intercepted TLS must reach the sink unterminated" -}}
 {{- end -}}
 {{- if .Values.serviceMonitor.enabled -}}
 {{- if not (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1") -}}
@@ -65,8 +86,8 @@
 {{- end -}}
 {{- end -}}
 {{- if .Values.certificate.enabled -}}
-{{- if not .Values.enrollment.host -}}
-{{- fail "certificate.enabled=true requires enrollment.host" -}}
+{{- if not .Values.hostname -}}
+{{- fail "certificate.enabled=true requires hostname" -}}
 {{- end -}}
 {{- if not (.Capabilities.APIVersions.Has "cert-manager.io/v1") -}}
 {{- fail "certificate.enabled=true requires the cert-manager.io/v1 API" -}}

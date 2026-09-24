@@ -60,9 +60,9 @@ tests:
       - templates/certificate.yaml
     set:
       pki.existingSecret: pki
-      enrollment.host: enroll.example.com
-      enrollment.tls.secretName: enrollment-tls
+      hostname: status.example.com
       certificate.enabled: true
+      certificate.secretName: status-tls
       certificate.issuerRef:
         name: issuer
         kind: ClusterIssuer
@@ -74,20 +74,20 @@ tests:
       - containsDocument:
           kind: Certificate
           apiVersion: cert-manager.io/v1
-          name: rel-adblock-recovery-sink-enrollment
+          name: rel-adblock-recovery-sink-tls
       - equal:
           path: spec.secretName
-          value: enrollment-tls
+          value: status-tls
       - equal:
           path: spec.issuerRef.name
           value: issuer
 
-  - it: uses the generated enrollment TLS Secret name
+  - it: uses the generated TLS Secret name
     templates:
       - templates/certificate.yaml
     set:
       pki.existingSecret: pki
-      enrollment.host: enroll.example.com
+      hostname: status.example.com
       certificate.enabled: true
       certificate.issuerRef:
         name: issuer
@@ -98,7 +98,7 @@ tests:
     asserts:
       - equal:
           path: spec.secretName
-          value: rel-adblock-recovery-sink-enrollment-tls
+          value: rel-adblock-recovery-sink-tls
 
   - it: does not render a VPA when disabled
     templates:

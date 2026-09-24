@@ -3,14 +3,14 @@
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: {{ include "ars.fullname" . }}-enrollment
+  name: {{ include "ars.fullname" . }}-tls
   namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "ars.labels" . | nindent 4 }}
 spec:
-  secretName: {{ include "ars.enrollmentTLSSecretName" . | quote }}
+  secretName: {{ include "ars.tlsSecretName" . | quote }}
   issuerRef:
     {{- toYaml .Values.certificate.issuerRef | nindent 4 }}
   dnsNames:
-    - {{ .Values.enrollment.host | quote }}
+    - {{ .Values.hostname | quote }}
 {{- end }}

@@ -39,7 +39,7 @@ tests:
       profiles:
         - adshield
         - fallback
-      enrollment.host: enroll.example.com
+      hostname: status.example.com
       logLevel: debug
       logFormat: text
     capabilities:
@@ -59,8 +59,8 @@ tests:
           path: data.ARS_PROFILES
           value: adshield,fallback
       - equal:
-          path: data.ARS_ENROLLMENT_HOST
-          value: enroll.example.com
+          path: data.ARS_HOSTNAME
+          value: status.example.com
       - equal:
           path: data.ARS_LOG_LEVEL
           value: debug

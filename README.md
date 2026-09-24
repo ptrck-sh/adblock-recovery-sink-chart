@@ -8,17 +8,64 @@ The chart mounts no volumes. Application configuration is supplied only through 
 
 ## Routing
 
-| Mode | Interception | Enrollment |
-| --- | --- | --- |
-| `traefik` | Traefik `IngressRouteTCP` with TLS passthrough | Traefik `IngressRoute` |
-| `gateway` | Gateway API `TLSRoute` | Gateway API `HTTPRoute` |
-| `ingress` | Expose the sink Service directly as `LoadBalancer` or `NodePort` | Standard Kubernetes `Ingress` |
+TLS interception and the app's public web hostname are configured separately. The sink remains TLS passthrough. The ops Service exposes `/status`, `/install`, `/ca.crt`, `/ca.pem`, `/ca-chain.pem`, and `/fingerprint`; each external route is an exact path match. `/status` shows health and CA statistics. `/metrics`, `/healthz`, and `/readyz` are never exposed externally.
 
-Enrollment routes are created only when `enrollment.host` is set. They expose only the enrollment paths.
+Defaults are cluster-neutral. The default Traefik interception configuration is:
+
+```yaml
+interception:
+  hosts:
+    - html-load.com
+  traefik:
+    enabled: true
+    entryPoints:
+      - websecure
+```
+
+Use a standard Ingress for the web hostname. When `ingress.hosts` is empty, it falls back to `hostname`.
+
+```yaml
+hostname: status.example.com
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: example-issuer
+  tls:
+    - secretName: status-tls
+      hosts:
+        - status.example.com
+```
+
+Gateway API routes are configured independently. A TLSRoute is created only when `tlsRoute.parentRefs` is set; an HTTPRoute is created only when `httpRoute.parentRefs` is set.
+
+```yaml
+hostname: status.example.com
+gateway:
+  enabled: true
+  tlsRoute:
+    parentRefs:
+      - name: shared-gateway
+        sectionName: tls
+  httpRoute:
+    parentRefs:
+      - name: shared-gateway
+        sectionName: https
+```
+
+To create a certificate, enable cert-manager and set an issuer. The Certificate uses `hostname` and writes `certificate.secretName`, or `<fullname>-tls` when it is empty. Reference that Secret explicitly from `ingress.tls` or from your Gateway listener.
+
+```yaml
+hostname: status.example.com
+certificate:
+  enabled: true
+  secretName: status-tls
+  issuerRef:
+    name: example-issuer
+    kind: ClusterIssuer
+```
 
 ## Configuration
-
-Defaults are cluster-neutral. Configure routing integrations and allowed network peers for the cluster where the chart runs.
 
 A k3s installation using the bundled Traefik can restrict sink and ops access to Traefik in `kube-system`:
 
@@ -36,26 +83,10 @@ networkPolicy:
 If Traefik filters CRDs by ingress class, set its matching annotation:
 
 ```yaml
-routing:
+interception:
   traefik:
     annotations:
       kubernetes.io/ingress.class: traefik-example
-```
-
-For enrollment TLS, let Traefik resolve certificates or enable cert-manager with an issuer:
-
-```yaml
-routing:
-  traefik:
-    certResolver: example-resolver
-```
-
-```yaml
-certificate:
-  enabled: true
-  issuerRef:
-    name: example-issuer
-    kind: ClusterIssuer
 ```
 
 Supply additional application configuration with `extraEnv`:
@@ -81,12 +112,16 @@ NetworkPolicy is enabled by default. It allows ingress on the sink and ops ports
 | affinity | object | `{}` |  |
 | certificate.enabled | bool | `false` |  |
 | certificate.issuerRef | object | `{}` |  |
+| certificate.secretName | string | `""` |  |
 | containerPorts.ops | int | `8080` |  |
 | containerPorts.sink | int | `8443` |  |
-| enrollment.host | string | `""` |  |
-| enrollment.tls.secretName | string | `""` |  |
 | extraEnv | list | `[]` |  |
 | fullnameOverride | string | `""` |  |
+| gateway.annotations | object | `{}` |  |
+| gateway.enabled | bool | `false` |  |
+| gateway.httpRoute.parentRefs | list | `[]` |  |
+| gateway.tlsRoute.parentRefs | list | `[]` |  |
+| hostname | string | `""` |  |
 | hpa.enabled | bool | `false` |  |
 | hpa.maxReplicas | int | `3` |  |
 | hpa.minReplicas | int | `1` |  |
@@ -96,7 +131,15 @@ NetworkPolicy is enabled by default. It allows ingress on the sink and ops ports
 | image.repository | string | `"registry.gitlab.com/ptrck-sh/adblock-recovery-sink"` |  |
 | image.tag | string | `""` |  |
 | imagePullSecrets | list | `[]` |  |
+| ingress.annotations | object | `{}` |  |
+| ingress.className | string | `""` |  |
+| ingress.enabled | bool | `false` |  |
+| ingress.hosts | list | `[]` |  |
+| ingress.tls | list | `[]` |  |
 | interception.hosts[0] | string | `"html-load.com"` |  |
+| interception.traefik.annotations | object | `{}` |  |
+| interception.traefik.enabled | bool | `true` |  |
+| interception.traefik.entryPoints[0] | string | `"websecure"` |  |
 | livenessProbe.httpGet.path | string | `"/healthz"` |  |
 | livenessProbe.httpGet.port | string | `"ops"` |  |
 | logFormat | string | `"json"` |  |
@@ -129,15 +172,6 @@ NetworkPolicy is enabled by default. It allows ingress on the sink and ops ports
 | resources.requests.cpu | string | `"10m"` |  |
 | resources.requests.memory | string | `"32Mi"` |  |
 | revisionHistoryLimit | int | `3` |  |
-| routing.gateway.httpParentRefs | list | `[]` |  |
-| routing.gateway.tlsParentRefs | list | `[]` |  |
-| routing.ingress.annotations | object | `{}` |  |
-| routing.ingress.className | string | `""` |  |
-| routing.mode | string | `"traefik"` |  |
-| routing.traefik.annotations | object | `{}` |  |
-| routing.traefik.certResolver | string | `""` |  |
-| routing.traefik.enrollmentEntryPoints | list | `[]` |  |
-| routing.traefik.entryPoints[0] | string | `"websecure"` |  |
 | securityContext.allowPrivilegeEscalation | bool | `false` |  |
 | securityContext.capabilities.drop[0] | string | `"ALL"` |  |
 | securityContext.readOnlyRootFilesystem | bool | `true` |  |

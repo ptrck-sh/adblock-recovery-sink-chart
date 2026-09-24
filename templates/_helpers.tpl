@@ -44,16 +44,12 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 {{- end -}}
 
-{{- define "ars.enrollmentTLSSecretName" -}}
-{{- default (printf "%s-enrollment-tls" (include "ars.fullname" .)) .Values.enrollment.tls.secretName -}}
+{{- define "ars.tlsSecretName" -}}
+{{- default (printf "%s-tls" (include "ars.fullname" .)) .Values.certificate.secretName -}}
 {{- end -}}
 
 {{- define "ars.sniMatch" -}}
 {{- range $index, $host := .Values.interception.hosts -}}
 {{- if $index }} || {{ end -}}HostSNI(`{{ $host }}`)
 {{- end -}}
-{{- end -}}
-
-{{- define "ars.enrollmentMatch" -}}
-Host(`{{ .Values.enrollment.host }}`) && (Path(`/install`) || Path(`/ca.crt`) || Path(`/ca.pem`) || Path(`/ca-chain.pem`) || Path(`/fingerprint`))
 {{- end -}}

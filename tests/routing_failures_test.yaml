@@ -2,27 +2,52 @@ suite: routing failures
 templates:
   - templates/routing.yaml
 tests:
-  - it: fails without the Traefik API
+  - it: fails without the Traefik API when interception is enabled
     set:
       pki.existingSecret: pki
     asserts:
       - failedTemplate:
-          errorMessage: routing.mode=traefik requires the traefik.io/v1alpha1 API
+          errorMessage: interception.traefik.enabled=true requires the traefik.io/v1alpha1 API
 
-  - it: fails Ingress mode without direct sink exposure
+  - it: fails when intercepted TLS has no unterminated path to the sink
     set:
       pki.existingSecret: pki
-      routing.mode: ingress
+      interception.traefik.enabled: false
     asserts:
       - failedTemplate:
-          errorMessage: routing.mode=ingress requires service.sink.type to be LoadBalancer or NodePort because standard Ingress cannot pass TLS through
+          errorMessage: intercepted TLS must reach the sink unterminated
 
-  - it: fails Gateway mode without the TLSRoute API
+  - it: fails without the Gateway TLSRoute API
     set:
       pki.existingSecret: pki
-      routing.mode: gateway
-      routing.gateway.tlsParentRefs:
+      interception.traefik.enabled: false
+      gateway.enabled: true
+      gateway.tlsRoute.parentRefs:
         - name: shared-gateway
     asserts:
       - failedTemplate:
-          errorMessage: routing.mode=gateway requires the gateway.networking.k8s.io/v1alpha2/TLSRoute API
+          errorMessage: gateway.tlsRoute.parentRefs requires the gateway.networking.k8s.io/v1alpha2/TLSRoute API
+
+  - it: fails when an HTTPRoute has no hostname
+    set:
+      pki.existingSecret: pki
+      gateway.enabled: true
+      gateway.httpRoute.parentRefs:
+        - name: shared-gateway
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - failedTemplate:
+          errorMessage: gateway.httpRoute.parentRefs requires hostname
+
+  - it: fails when enabled Ingress has no host
+    set:
+      pki.existingSecret: pki
+      ingress.enabled: true
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - failedTemplate:
+          errorMessage: ingress.enabled=true requires ingress.hosts or hostname

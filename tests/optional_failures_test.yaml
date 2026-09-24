@@ -5,8 +5,9 @@ tests:
   - it: fails extra environment PKI overrides
     set:
       pki.existingSecret: pki
-      extraEnv[0].name: ARS_PKI_ROOT_CERT
-      extraEnv[0].value: overridden
+      extraEnv:
+        - name: ARS_PKI_ROOT_CERT
+          value: overridden
     capabilities:
       apiVersions:
         - traefik.io/v1alpha1
@@ -27,3 +28,16 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: hpa.enabled and vpa.enabled require vpa.updateMode to be Off
+
+  - it: fails an enabled certificate without a hostname
+    set:
+      pki.existingSecret: pki
+      certificate.enabled: true
+      certificate.issuerRef.name: issuer
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+        - cert-manager.io/v1
+    asserts:
+      - failedTemplate:
+          errorMessage: certificate.enabled=true requires hostname

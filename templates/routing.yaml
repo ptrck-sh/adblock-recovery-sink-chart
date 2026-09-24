@@ -1,5 +1,5 @@
 {{- include "ars.validate" . -}}
-{{- if eq .Values.routing.mode "traefik" }}
+{{- if .Values.interception.traefik.enabled }}
 apiVersion: traefik.io/v1alpha1
 kind: IngressRouteTCP
 metadata:
@@ -7,13 +7,13 @@ metadata:
   namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "ars.labels" . | nindent 4 }}
-  {{- with .Values.routing.traefik.annotations }}
+  {{- with .Values.interception.traefik.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
   entryPoints:
-    {{- toYaml .Values.routing.traefik.entryPoints | nindent 4 }}
+    {{- toYaml .Values.interception.traefik.entryPoints | nindent 4 }}
   routes:
     - match: {{ include "ars.sniMatch" . | quote }}
       services:
@@ -21,36 +21,9 @@ spec:
           port: {{ .Values.service.sink.port }}
   tls:
     passthrough: true
-{{- if .Values.enrollment.host }}
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: {{ include "ars.fullname" . }}-enrollment
-  namespace: {{ .Release.Namespace | quote }}
-  labels:
-    {{- include "ars.labels" . | nindent 4 }}
-  {{- with .Values.routing.traefik.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-spec:
-  entryPoints:
-    {{- toYaml (default .Values.routing.traefik.entryPoints .Values.routing.traefik.enrollmentEntryPoints) | nindent 4 }}
-  routes:
-    - match: {{ include "ars.enrollmentMatch" . | quote }}
-      kind: Rule
-      services:
-        - name: {{ include "ars.fullname" . }}-ops
-          port: {{ .Values.service.ops.port }}
-  tls:
-    {{- if .Values.routing.traefik.certResolver }}
-    certResolver: {{ .Values.routing.traefik.certResolver | quote }}
-    {{- else }}
-    secretName: {{ include "ars.enrollmentTLSSecretName" . | quote }}
-    {{- end }}
 {{- end }}
-{{- else if eq .Values.routing.mode "gateway" }}
+{{- if and .Values.gateway.enabled .Values.gateway.tlsRoute.parentRefs }}
+---
 apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: TLSRoute
 metadata:
@@ -58,31 +31,40 @@ metadata:
   namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "ars.labels" . | nindent 4 }}
+  {{- with .Values.gateway.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   parentRefs:
-    {{- toYaml .Values.routing.gateway.tlsParentRefs | nindent 4 }}
+    {{- toYaml .Values.gateway.tlsRoute.parentRefs | nindent 4 }}
   hostnames:
     {{- toYaml .Values.interception.hosts | nindent 4 }}
   rules:
     - backendRefs:
         - name: {{ include "ars.fullname" . }}-sink
           port: {{ .Values.service.sink.port }}
-{{- if .Values.enrollment.host }}
+{{- end }}
+{{- if and .Values.gateway.enabled .Values.gateway.httpRoute.parentRefs }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: {{ include "ars.fullname" . }}-enrollment
+  name: {{ include "ars.fullname" . }}-ops
   namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "ars.labels" . | nindent 4 }}
+  {{- with .Values.gateway.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   parentRefs:
-    {{- toYaml .Values.routing.gateway.httpParentRefs | nindent 4 }}
+    {{- toYaml .Values.gateway.httpRoute.parentRefs | nindent 4 }}
   hostnames:
-    - {{ .Values.enrollment.host | quote }}
+    - {{ .Values.hostname | quote }}
   rules:
-    {{- range $path := list "/install" "/ca.crt" "/ca.pem" "/ca-chain.pem" "/fingerprint" }}
+    {{- range $path := list "/status" "/install" "/ca.crt" "/ca.pem" "/ca-chain.pem" "/fingerprint" }}
     - matches:
         - path:
             type: Exact
@@ -92,31 +74,37 @@ spec:
           port: {{ $.Values.service.ops.port }}
     {{- end }}
 {{- end }}
-{{- else if and (eq .Values.routing.mode "ingress") .Values.enrollment.host }}
+{{- if .Values.ingress.enabled }}
+{{- $hosts := .Values.ingress.hosts }}
+{{- if not $hosts }}
+{{- $hosts = list (dict "host" .Values.hostname) }}
+{{- end }}
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "ars.fullname" . }}-enrollment
+  name: {{ include "ars.fullname" . }}-ops
   namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "ars.labels" . | nindent 4 }}
-  {{- with .Values.routing.ingress.annotations }}
+  {{- with .Values.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  {{- with .Values.routing.ingress.className }}
+  {{- with .Values.ingress.className }}
   ingressClassName: {{ . | quote }}
   {{- end }}
+  {{- with .Values.ingress.tls }}
   tls:
-    - hosts:
-        - {{ .Values.enrollment.host | quote }}
-      secretName: {{ include "ars.enrollmentTLSSecretName" . | quote }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   rules:
-    - host: {{ .Values.enrollment.host | quote }}
+    {{- range $entry := $hosts }}
+    - host: {{ $entry.host | quote }}
       http:
         paths:
-          {{- range $path := list "/install" "/ca.crt" "/ca.pem" "/ca-chain.pem" "/fingerprint" }}
+          {{- range $path := list "/status" "/install" "/ca.crt" "/ca.pem" "/ca-chain.pem" "/fingerprint" }}
           - path: {{ $path | quote }}
             pathType: Exact
             backend:
@@ -125,4 +113,5 @@ spec:
                 port:
                   number: {{ $.Values.service.ops.port }}
           {{- end }}
+    {{- end }}
 {{- end }}

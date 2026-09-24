@@ -13,6 +13,6 @@ data:
   ARS_PROFILES: {{ join "," .Values.profiles | quote }}
   ARS_LOG_LEVEL: {{ .Values.logLevel | quote }}
   ARS_LOG_FORMAT: {{ .Values.logFormat | quote }}
-  {{- with .Values.enrollment.host }}
-  ARS_ENROLLMENT_HOST: {{ . | quote }}
+  {{- with .Values.hostname }}
+  ARS_HOSTNAME: {{ . | quote }}
   {{- end }}
