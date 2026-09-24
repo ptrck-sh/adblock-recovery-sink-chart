@@ -2,8 +2,8 @@ apiVersion: v2
 name: adblock-recovery-sink
 description: Serves harmless replacements for anti-adblock loader resources behind user-managed LAN DNS rewrites.
 type: application
-version: "0.3.0"
-appVersion: "0.2.0"
+version: "0.4.0-rc.1"
+appVersion: "0.3.0-rc.1"
 home: https://gitlab.com/ptrck-sh/adblock-recovery-sink
 sources:
   - https://gitlab.com/ptrck-sh/adblock-recovery-sink
