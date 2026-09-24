@@ -3,7 +3,7 @@ release:
   name: rel
   namespace: test
 tests:
-  - it: renders the default Traefik TLS passthrough route without a catch-all
+  - it: renders the default Traefik interception route
     templates:
       - templates/routing.yaml
     set:
@@ -12,6 +12,8 @@ tests:
       apiVersions:
         - traefik.io/v1alpha1
     asserts:
+      - hasDocuments:
+          count: 1
       - containsDocument:
           kind: IngressRouteTCP
           apiVersion: traefik.io/v1alpha1
@@ -20,107 +22,173 @@ tests:
           path: spec.routes[0].match
           value: HostSNI(`html-load.com`)
       - equal:
+          path: spec.routes[0].services[0].port
+          value: 443
+      - equal:
           path: spec.tls.passthrough
           value: true
-      - notMatchRegex:
-          path: spec.routes[0].match
-          pattern: "\\*"
 
-  - it: applies Traefik annotations to the interception route
-    templates:
-      - templates/routing.yaml
-    set:
-      pki.existingSecret: pki
-      interception.traefik.annotations:
-        kubernetes.io/ingress.class: traefik-external
-    capabilities:
-      apiVersions:
-        - traefik.io/v1alpha1
-    asserts:
-      - equal:
-          path: metadata.annotations["kubernetes.io/ingress.class"]
-          value: traefik-external
-
-  - it: renders an Ingress with the fixed public paths and configured TLS
+  - it: renders a Traefik web route from the hostname with a resolver and class
     templates:
       - templates/routing.yaml
     set:
       pki.existingSecret: pki
       hostname: status.example.com
-      ingress.enabled: true
-      ingress.className: nginx
-      ingress.annotations:
-        cert-manager.io/cluster-issuer: issuer
-      ingress.tls:
-        - secretName: status-tls
-          hosts:
-            - status.example.com
+      ingress.className: traefik-external
+      ingress.certResolver: resolver
     capabilities:
       apiVersions:
         - traefik.io/v1alpha1
     asserts:
+      - hasDocuments:
+          count: 2
       - containsDocument:
-          kind: Ingress
-          apiVersion: networking.k8s.io/v1
+          kind: IngressRoute
+          apiVersion: traefik.io/v1alpha1
           name: rel-adblock-recovery-sink-ops
-        documentIndex: 1
+        documentIndex: 0
       - equal:
-          path: spec.ingressClassName
-          value: nginx
-        documentIndex: 1
+          path: metadata.annotations["kubernetes.io/ingress.class"]
+          value: traefik-external
+        documentIndex: 0
+      - matchRegex:
+          path: spec.routes[0].match
+          pattern: 'Host\(`status.example.com`\)'
+        documentIndex: 0
+      - matchRegex:
+          path: spec.routes[0].match
+          pattern: 'Path\(`/fingerprint`\)'
+        documentIndex: 0
+      - notMatchRegex:
+          path: spec.routes[0].match
+          pattern: 'Path\(`/`\)'
+        documentIndex: 0
       - equal:
-          path: spec.rules[0].host
-          value: status.example.com
-        documentIndex: 1
+          path: spec.routes[0].services[0].port
+          value: 8443
+        documentIndex: 0
       - equal:
-          path: spec.rules[0].http.paths[0].path
-          value: /status
-        documentIndex: 1
-      - equal:
-          path: spec.rules[0].http.paths[5].path
-          value: /fingerprint
-        documentIndex: 1
-      - equal:
-          path: spec.rules[0].http.paths[0].pathType
-          value: Exact
-        documentIndex: 1
-      - notContains:
-          path: spec.rules[0].http.paths
-          content:
-            path: /
-        documentIndex: 1
-      - equal:
-          path: spec.tls[0].secretName
-          value: status-tls
-        documentIndex: 1
+          path: spec.tls.certResolver
+          value: resolver
+        documentIndex: 0
 
-  - it: renders configured Ingress hosts and custom ops port
+  - it: renders configured Traefik hosts and the first TLS Secret
     templates:
       - templates/routing.yaml
     set:
       pki.existingSecret: pki
-      ingress.enabled: true
       ingress.hosts:
         - host: install.example.com
-      service.ops.port: 18080
+        - host: status.example.com
+      ingress.tls:
+        - secretName: status-tls
     capabilities:
       apiVersions:
         - traefik.io/v1alpha1
     asserts:
+      - matchRegex:
+          path: spec.routes[0].match
+          pattern: 'Host\(`install.example.com`\) \|\| Host\(`status.example.com`\)'
+        documentIndex: 0
+      - equal:
+          path: spec.tls.secretName
+          value: status-tls
+        documentIndex: 0
+
+  - it: renders a standard Ingress web route with fallback, class, and TLS
+    templates:
+      - templates/routing.yaml
+    set:
+      pki.existingSecret: pki
+      hostname: status.example.com
+      ingress.kind: Ingress
+      ingress.className: nginx
+      ingress.tls:
+        - secretName: status-tls
+          hosts:
+            - status.example.com
+      service.sink.type: LoadBalancer
+    asserts:
+      - hasDocuments:
+          count: 1
+      - containsDocument:
+          kind: Ingress
+          apiVersion: networking.k8s.io/v1
+          name: rel-adblock-recovery-sink-ops
+      - equal:
+          path: spec.ingressClassName
+          value: nginx
       - equal:
           path: spec.rules[0].host
-          value: install.example.com
-        documentIndex: 1
+          value: status.example.com
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /status
+      - equal:
+          path: spec.rules[0].http.paths[5].path
+          value: /fingerprint
+      - equal:
+          path: spec.rules[0].http.paths[0].pathType
+          value: Exact
+      - notContains:
+          path: spec.rules[0].http.paths
+          content:
+            path: /
+      - equal:
+          path: spec.tls[0].secretName
+          value: status-tls
+
+  - it: renders a standard passthrough Ingress with overriding annotations
+    templates:
+      - templates/routing.yaml
+    set:
+      pki.existingSecret: pki
+      ingress.kind: Ingress
+      ingress.className: nginx
+      ingress.annotations:
+        example.com/shared: base
+        example.com/override: base
+      ingress.passthrough.enabled: true
+      ingress.passthrough.annotations:
+        example.com/override: sink
+        nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+      interception.hosts:
+        - html-load.com
+        - assets.example.net
+    asserts:
+      - hasDocuments:
+          count: 1
+      - containsDocument:
+          kind: Ingress
+          apiVersion: networking.k8s.io/v1
+          name: rel-adblock-recovery-sink-sink
+      - equal:
+          path: metadata.annotations["example.com/shared"]
+          value: base
+      - equal:
+          path: metadata.annotations["example.com/override"]
+          value: sink
+      - equal:
+          path: spec.rules[1].host
+          value: assets.example.net
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /
+      - equal:
+          path: spec.rules[0].http.paths[0].pathType
+          value: Prefix
       - equal:
           path: spec.rules[0].http.paths[0].backend.service.port.number
-          value: 18080
-        documentIndex: 1
+          value: 443
+      - notExists:
+          path: spec.tls
 
   - it: renders Gateway API routes with fixed public paths
     templates:
       - templates/routing.yaml
     set:
       pki.existingSecret: pki
+      ingress.enabled: false
       hostname: status.example.com
       gateway.enabled: true
       gateway.annotations:
@@ -133,43 +201,38 @@ tests:
           sectionName: https
     capabilities:
       apiVersions:
-        - traefik.io/v1alpha1
         - gateway.networking.k8s.io/v1alpha2/TLSRoute
         - gateway.networking.k8s.io/v1/HTTPRoute
     asserts:
       - hasDocuments:
-          count: 3
+          count: 2
       - equal:
           path: spec.hostnames[0]
           value: html-load.com
-        documentIndex: 1
+        documentIndex: 0
       - equal:
           path: spec.hostnames[0]
           value: status.example.com
-        documentIndex: 2
+        documentIndex: 1
       - equal:
           path: spec.rules[0].matches[0].path.value
           value: /status
-        documentIndex: 2
+        documentIndex: 1
       - equal:
           path: spec.rules[5].matches[0].path.value
           value: /fingerprint
-        documentIndex: 2
-      - equal:
-          path: metadata.annotations["example.com/exposure"]
-          value: public
         documentIndex: 1
       - equal:
           path: metadata.annotations["example.com/exposure"]
           value: public
-        documentIndex: 2
+        documentIndex: 1
 
-  - it: renders a Gateway TLSRoute independently with custom sink port
+  - it: renders a Gateway TLSRoute independently with a custom sink port
     templates:
       - templates/routing.yaml
     set:
       pki.existingSecret: pki
-      interception.traefik.enabled: false
+      ingress.enabled: false
       gateway.enabled: true
       gateway.tlsRoute.parentRefs:
         - name: shared-gateway

@@ -8,39 +8,56 @@ The chart mounts no volumes. Application configuration is supplied only through 
 
 ## Routing
 
-TLS interception and the app's public web hostname are configured separately. The sink remains TLS passthrough. The ops Service exposes `/status`, `/install`, `/ca.crt`, `/ca.pem`, `/ca-chain.pem`, and `/fingerprint`; each external route is an exact path match. `/status` shows health and CA statistics. `/metrics`, `/healthz`, and `/readyz` are never exposed externally.
+TLS interception and the public web hostname are configured separately. The sink listens on TLS port 443; the plain HTTP ops listener is port 8443. The chart sets `net.ipv4.ip_unprivileged_port_start` to the lowest container port below 1024 so the non-root container can bind it. Additional pod sysctls can be set with `podSecurityContext.sysctls`.
 
-Defaults are cluster-neutral. The default Traefik interception configuration is:
+The ops Service exposes `/status`, `/install`, `/ca.crt`, `/ca.pem`, `/ca-chain.pem`, and `/fingerprint`; every public web route uses those exact paths. `/metrics`, `/healthz`, and `/readyz` are never exposed externally.
 
-```yaml
-interception:
-  hosts:
-    - html-load.com
-  traefik:
-    enabled: true
-    entryPoints:
-      - websecure
-```
-
-Use a standard Ingress for the web hostname. When `ingress.hosts` is empty, it falls back to `hostname`.
+Defaults use Traefik `IngressRoute` and TLS passthrough for intercepted hosts. When `ingress.hosts` is empty, the web route uses `hostname` when it is set.
 
 ```yaml
 hostname: status.example.com
 ingress:
-  enabled: true
+  kind: IngressRoute
+  entryPoints:
+    - websecure
+  certResolver: example-resolver
+```
+
+For nginx, choose `Ingress` and enable its SSL passthrough annotation. nginx must also run with `--enable-ssl-passthrough`.
+
+```yaml
+hostname: status.example.com
+ingress:
+  kind: Ingress
   className: nginx
-  annotations:
-    cert-manager.io/cluster-issuer: example-issuer
+  passthrough:
+    enabled: true
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-passthrough: "true"
   tls:
     - secretName: status-tls
       hosts:
         - status.example.com
 ```
 
-Gateway API routes are configured independently. A TLSRoute is created only when `tlsRoute.parentRefs` is set; an HTTPRoute is created only when `httpRoute.parentRefs` is set.
+If a standard Ingress does not terminate interception traffic, leave passthrough disabled and expose the sink with a LoadBalancer or NodePort.
+
+```yaml
+ingress:
+  kind: Ingress
+  passthrough:
+    enabled: false
+service:
+  sink:
+    type: LoadBalancer
+```
+
+Gateway API routes are configured independently. A TLSRoute is created only when `tlsRoute.parentRefs` is set; an HTTPRoute is created only when `httpRoute.parentRefs` is set. Disable ingress when Gateway API is the selected route provider.
 
 ```yaml
 hostname: status.example.com
+ingress:
+  enabled: false
 gateway:
   enabled: true
   tlsRoute:
@@ -80,13 +97,11 @@ networkPolicy:
           app.kubernetes.io/name: traefik
 ```
 
-If Traefik filters CRDs by ingress class, set its matching annotation:
+If Traefik filters CRDs by ingress class, set `ingress.className`:
 
 ```yaml
-interception:
-  traefik:
-    annotations:
-      kubernetes.io/ingress.class: traefik-example
+ingress:
+  className: traefik-example
 ```
 
 Supply additional application configuration with `extraEnv`:
@@ -113,8 +128,8 @@ NetworkPolicy is enabled by default. It allows ingress on the sink and ops ports
 | certificate.enabled | bool | `false` |  |
 | certificate.issuerRef | object | `{}` |  |
 | certificate.secretName | string | `""` |  |
-| containerPorts.ops | int | `8080` |  |
-| containerPorts.sink | int | `8443` |  |
+| containerPorts.ops | int | `8443` |  |
+| containerPorts.sink | int | `443` |  |
 | extraEnv | list | `[]` |  |
 | fullnameOverride | string | `""` |  |
 | gateway.annotations | object | `{}` |  |
@@ -132,14 +147,16 @@ NetworkPolicy is enabled by default. It allows ingress on the sink and ops ports
 | image.tag | string | `""` |  |
 | imagePullSecrets | list | `[]` |  |
 | ingress.annotations | object | `{}` |  |
+| ingress.certResolver | string | `""` |  |
 | ingress.className | string | `""` |  |
-| ingress.enabled | bool | `false` |  |
+| ingress.enabled | bool | `true` |  |
+| ingress.entryPoints[0] | string | `"websecure"` |  |
 | ingress.hosts | list | `[]` |  |
+| ingress.kind | string | `"IngressRoute"` |  |
+| ingress.passthrough.annotations | object | `{}` |  |
+| ingress.passthrough.enabled | bool | `false` |  |
 | ingress.tls | list | `[]` |  |
 | interception.hosts[0] | string | `"html-load.com"` |  |
-| interception.traefik.annotations | object | `{}` |  |
-| interception.traefik.enabled | bool | `true` |  |
-| interception.traefik.entryPoints[0] | string | `"websecure"` |  |
 | livenessProbe.httpGet.path | string | `"/healthz"` |  |
 | livenessProbe.httpGet.port | string | `"ops"` |  |
 | logFormat | string | `"json"` |  |
@@ -177,7 +194,7 @@ NetworkPolicy is enabled by default. It allows ingress on the sink and ops ports
 | securityContext.readOnlyRootFilesystem | bool | `true` |  |
 | service.ops.annotations | object | `{}` |  |
 | service.ops.labels | object | `{}` |  |
-| service.ops.port | int | `8080` |  |
+| service.ops.port | int | `8443` |  |
 | service.sink.annotations | object | `{}` |  |
 | service.sink.externalTrafficPolicy | string | `""` |  |
 | service.sink.labels | object | `{}` |  |

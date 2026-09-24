@@ -14,11 +14,18 @@ imagePullSecrets: []
 hostname: ""
 
 ingress:
-  enabled: false
+  enabled: true
+  kind: IngressRoute
   className: ""
   annotations: {}
   hosts: []
   tls: []
+  entryPoints:
+    - websecure
+  certResolver: ""
+  passthrough:
+    enabled: false
+    annotations: {}
 
 gateway:
   enabled: false
@@ -31,11 +38,6 @@ gateway:
 interception:
   hosts:
     - html-load.com
-  traefik:
-    enabled: true
-    entryPoints:
-      - websecure
-    annotations: {}
 
 profiles:
   - adshield
@@ -80,8 +82,8 @@ resources:
     memory: 64Mi
 
 containerPorts:
-  sink: 8443
-  ops: 8080
+  sink: 443
+  ops: 8443
 
 extraEnv: []
 
@@ -115,7 +117,7 @@ service:
     labels: {}
     externalTrafficPolicy: ""
   ops:
-    port: 8080
+    port: 8443
     annotations: {}
     labels: {}
 

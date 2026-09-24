@@ -47,11 +47,11 @@
 {{- if .Values.hostname -}}
 {{- include "ars.validateHostname" .Values.hostname -}}
 {{- end -}}
-{{- if and .Values.ingress.enabled (not .Values.ingress.hosts) (not .Values.hostname) -}}
-{{- fail "ingress.enabled=true requires ingress.hosts or hostname" -}}
-{{- end -}}
 {{- range $entry := .Values.ingress.hosts -}}
 {{- include "ars.validateHostname" $entry.host -}}
+{{- end -}}
+{{- if and .Values.ingress.enabled (not (has .Values.ingress.kind (list "IngressRoute" "Ingress"))) -}}
+{{- fail "ingress.kind must be IngressRoute or Ingress" -}}
 {{- end -}}
 {{- if and .Values.gateway.enabled .Values.gateway.httpRoute.parentRefs (not .Values.hostname) -}}
 {{- fail "gateway.httpRoute.parentRefs requires hostname" -}}
@@ -62,9 +62,9 @@
 {{- fail "extraEnv entries must not use names beginning with ARS_PKI_" -}}
 {{- end -}}
 {{- end -}}
-{{- if .Values.interception.traefik.enabled -}}
+{{- if and .Values.ingress.enabled (eq .Values.ingress.kind "IngressRoute") -}}
 {{- if not (.Capabilities.APIVersions.Has "traefik.io/v1alpha1") -}}
-{{- fail "interception.traefik.enabled=true requires the traefik.io/v1alpha1 API" -}}
+{{- fail "ingress.kind=IngressRoute requires the traefik.io/v1alpha1 API" -}}
 {{- end -}}
 {{- end -}}
 {{- if and .Values.gateway.enabled .Values.gateway.tlsRoute.parentRefs -}}
@@ -77,7 +77,7 @@
 {{- fail "gateway.httpRoute.parentRefs requires the gateway.networking.k8s.io/v1/HTTPRoute API" -}}
 {{- end -}}
 {{- end -}}
-{{- if not (or .Values.interception.traefik.enabled (and .Values.gateway.enabled .Values.gateway.tlsRoute.parentRefs) (has .Values.service.sink.type (list "LoadBalancer" "NodePort"))) -}}
+{{- if not (or (and .Values.ingress.enabled (eq .Values.ingress.kind "IngressRoute")) (and .Values.ingress.enabled (eq .Values.ingress.kind "Ingress") .Values.ingress.passthrough.enabled) (and .Values.gateway.enabled .Values.gateway.tlsRoute.parentRefs) (has .Values.service.sink.type (list "LoadBalancer" "NodePort"))) -}}
 {{- fail "intercepted TLS must reach the sink unterminated" -}}
 {{- end -}}
 {{- if .Values.serviceMonitor.enabled -}}

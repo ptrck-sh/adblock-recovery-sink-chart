@@ -41,8 +41,22 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- $podSecurityContext := deepCopy .Values.podSecurityContext }}
+      {{- $sysctls := list }}
+      {{- $lowestPort := min (int .Values.containerPorts.sink) (int .Values.containerPorts.ops) }}
+      {{- range $sysctl := .Values.podSecurityContext.sysctls }}
+      {{- if or (ge $lowestPort 1024) (ne $sysctl.name "net.ipv4.ip_unprivileged_port_start") }}
+      {{- $sysctls = append $sysctls $sysctl }}
+      {{- end }}
+      {{- end }}
+      {{- if lt $lowestPort 1024 }}
+      {{- $sysctls = append $sysctls (dict "name" "net.ipv4.ip_unprivileged_port_start" "value" (printf "%d" $lowestPort)) }}
+      {{- end }}
+      {{- if $sysctls }}
+      {{- $_ := set $podSecurityContext "sysctls" $sysctls }}
+      {{- end }}
       securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+        {{- toYaml $podSecurityContext | nindent 8 }}
       containers:
         - name: sink
           image: {{ include "ars.image" . | quote }}

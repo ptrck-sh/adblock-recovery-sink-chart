@@ -48,10 +48,10 @@ tests:
     asserts:
       - equal:
           path: data.ARS_SINK_ADDR
-          value: ":8443"
+          value: ":443"
       - equal:
           path: data.ARS_OPS_ADDR
-          value: ":8080"
+          value: ":8443"
       - equal:
           path: data.ARS_HOSTS
           value: html-load.com,assets.example.net
@@ -101,6 +101,85 @@ tests:
       - equal:
           path: spec.template.spec.containers[0].ports[1].containerPort
           value: 9090
+
+  - it: renders the default ports and non-root binding sysctl
+    templates:
+      - templates/deployment.yaml
+    set:
+      pki.existingSecret: pki
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 443
+      - equal:
+          path: spec.template.spec.containers[0].ports[1].containerPort
+          value: 8443
+      - equal:
+          path: spec.template.spec.securityContext.sysctls[0].name
+          value: net.ipv4.ip_unprivileged_port_start
+      - equal:
+          path: spec.template.spec.securityContext.sysctls[0].value
+          value: "443"
+
+  - it: renders the default service ports
+    templates:
+      - templates/service.yaml
+    set:
+      pki.existingSecret: pki
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 443
+        documentIndex: 0
+      - equal:
+          path: spec.ports[0].port
+          value: 8443
+        documentIndex: 1
+
+  - it: omits the chart sysctl when all container ports are unprivileged
+    templates:
+      - templates/deployment.yaml
+    set:
+      pki.existingSecret: pki
+      containerPorts.sink: 10443
+      containerPorts.ops: 18443
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - notExists:
+          path: spec.template.spec.securityContext.sysctls
+
+  - it: merges configured sysctls while the chart sysctl wins
+    templates:
+      - templates/deployment.yaml
+    set:
+      pki.existingSecret: pki
+      podSecurityContext.sysctls:
+        - name: kernel.shm_rmid_forced
+          value: "1"
+        - name: net.ipv4.ip_unprivileged_port_start
+          value: "1"
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - contains:
+          path: spec.template.spec.securityContext.sysctls
+          content:
+            name: kernel.shm_rmid_forced
+            value: "1"
+      - contains:
+          path: spec.template.spec.securityContext.sysctls
+          content:
+            name: net.ipv4.ip_unprivileged_port_start
+            value: "443"
 
   - it: renders a hardened volume-free pod
     templates:

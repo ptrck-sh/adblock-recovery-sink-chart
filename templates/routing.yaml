@@ -1,5 +1,50 @@
 {{- include "ars.validate" . -}}
-{{- if .Values.interception.traefik.enabled }}
+{{- $hosts := .Values.ingress.hosts }}
+{{- if and (not $hosts) .Values.hostname }}
+{{- $hosts = list (dict "host" .Values.hostname) }}
+{{- end }}
+{{- $annotations := deepCopy .Values.ingress.annotations }}
+{{- if .Values.ingress.className }}
+{{- $_ := set $annotations "kubernetes.io/ingress.class" .Values.ingress.className }}
+{{- end }}
+{{- if and .Values.ingress.enabled (eq .Values.ingress.kind "IngressRoute") }}
+{{- if $hosts }}
+{{- $hostMatches := list }}
+{{- range $host := $hosts }}
+{{- $hostMatches = append $hostMatches (printf "Host(`%s`)" $host.host) }}
+{{- end }}
+{{- $pathMatches := list }}
+{{- range $path := list "/status" "/install" "/ca.crt" "/ca.pem" "/ca-chain.pem" "/fingerprint" }}
+{{- $pathMatches = append $pathMatches (printf "Path(`%s`)" $path) }}
+{{- end }}
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ include "ars.fullname" . }}-ops
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "ars.labels" . | nindent 4 }}
+  {{- with $annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  entryPoints:
+    {{- toYaml .Values.ingress.entryPoints | nindent 4 }}
+  routes:
+    - match: {{ printf "(%s) && (%s)" (join " || " $hostMatches) (join " || " $pathMatches) | quote }}
+      services:
+        - name: {{ include "ars.fullname" . }}-ops
+          port: {{ .Values.service.ops.port }}
+  {{- if .Values.ingress.certResolver }}
+  tls:
+    certResolver: {{ .Values.ingress.certResolver | quote }}
+  {{- else if and .Values.ingress.tls (index .Values.ingress.tls 0).secretName }}
+  tls:
+    secretName: {{ (index .Values.ingress.tls 0).secretName | quote }}
+  {{- end }}
+{{- end }}
+---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRouteTCP
 metadata:
@@ -7,13 +52,13 @@ metadata:
   namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "ars.labels" . | nindent 4 }}
-  {{- with .Values.interception.traefik.annotations }}
+  {{- with $annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
   entryPoints:
-    {{- toYaml .Values.interception.traefik.entryPoints | nindent 4 }}
+    {{- toYaml .Values.ingress.entryPoints | nindent 4 }}
   routes:
     - match: {{ include "ars.sniMatch" . | quote }}
       services:
@@ -21,6 +66,75 @@ spec:
           port: {{ .Values.service.sink.port }}
   tls:
     passthrough: true
+{{- end }}
+{{- if and .Values.ingress.enabled (eq .Values.ingress.kind "Ingress") $hosts }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "ars.fullname" . }}-ops
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "ars.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range $host := $hosts }}
+    - host: {{ $host.host | quote }}
+      http:
+        paths:
+          {{- range $path := list "/status" "/install" "/ca.crt" "/ca.pem" "/ca-chain.pem" "/fingerprint" }}
+          - path: {{ $path | quote }}
+            pathType: Exact
+            backend:
+              service:
+                name: {{ include "ars.fullname" $ }}-ops
+                port:
+                  number: {{ $.Values.service.ops.port }}
+          {{- end }}
+    {{- end }}
+{{- end }}
+{{- if and .Values.ingress.enabled (eq .Values.ingress.kind "Ingress") .Values.ingress.passthrough.enabled }}
+{{- $passthroughAnnotations := mergeOverwrite (deepCopy .Values.ingress.annotations) .Values.ingress.passthrough.annotations }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "ars.fullname" . }}-sink
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "ars.labels" . | nindent 4 }}
+  {{- with $passthroughAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . | quote }}
+  {{- end }}
+  rules:
+    {{- range $host := .Values.interception.hosts }}
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          - path: "/"
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "ars.fullname" $ }}-sink
+                port:
+                  number: {{ $.Values.service.sink.port }}
+    {{- end }}
 {{- end }}
 {{- if and .Values.gateway.enabled .Values.gateway.tlsRoute.parentRefs }}
 ---
@@ -72,46 +186,5 @@ spec:
       backendRefs:
         - name: {{ include "ars.fullname" $ }}-ops
           port: {{ $.Values.service.ops.port }}
-    {{- end }}
-{{- end }}
-{{- if .Values.ingress.enabled }}
-{{- $hosts := .Values.ingress.hosts }}
-{{- if not $hosts }}
-{{- $hosts = list (dict "host" .Values.hostname) }}
-{{- end }}
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: {{ include "ars.fullname" . }}-ops
-  namespace: {{ .Release.Namespace | quote }}
-  labels:
-    {{- include "ars.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-spec:
-  {{- with .Values.ingress.className }}
-  ingressClassName: {{ . | quote }}
-  {{- end }}
-  {{- with .Values.ingress.tls }}
-  tls:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-  rules:
-    {{- range $entry := $hosts }}
-    - host: {{ $entry.host | quote }}
-      http:
-        paths:
-          {{- range $path := list "/status" "/install" "/ca.crt" "/ca.pem" "/ca-chain.pem" "/fingerprint" }}
-          - path: {{ $path | quote }}
-            pathType: Exact
-            backend:
-              service:
-                name: {{ include "ars.fullname" $ }}-ops
-                port:
-                  number: {{ $.Values.service.ops.port }}
-          {{- end }}
     {{- end }}
 {{- end }}
