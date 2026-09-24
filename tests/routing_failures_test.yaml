@@ -1,0 +1,58 @@
+suite: routing failures
+templates:
+  - templates/routing.yaml
+tests:
+  - it: fails without the Traefik API for the default ingress kind
+    set:
+      pki.existingSecret: pki
+    asserts:
+      - failedTemplate:
+          errorMessage: ingress.kind=IngressRoute requires the traefik.io/v1alpha1 API
+
+  - it: fails for an unsupported ingress kind
+    set:
+      pki.existingSecret: pki
+      ingress.kind: HTTPProxy
+    asserts:
+      - failedTemplate:
+          errorMessage: ingress.kind must be IngressRoute or Ingress
+
+  - it: fails when a standard Ingress has no unterminated sink path
+    set:
+      pki.existingSecret: pki
+      ingress.kind: Ingress
+    asserts:
+      - failedTemplate:
+          errorMessage: intercepted TLS must reach the sink unterminated
+
+  - it: fails when ingress is disabled without another sink path
+    set:
+      pki.existingSecret: pki
+      ingress.enabled: false
+    asserts:
+      - failedTemplate:
+          errorMessage: intercepted TLS must reach the sink unterminated
+
+  - it: fails without the Gateway TLSRoute API
+    set:
+      pki.existingSecret: pki
+      ingress.enabled: false
+      gateway.enabled: true
+      gateway.tlsRoute.parentRefs:
+        - name: shared-gateway
+    asserts:
+      - failedTemplate:
+          errorMessage: gateway.tlsRoute.parentRefs requires the gateway.networking.k8s.io/v1alpha2/TLSRoute API
+
+  - it: fails when an HTTPRoute has no hostname
+    set:
+      pki.existingSecret: pki
+      gateway.enabled: true
+      gateway.httpRoute.parentRefs:
+        - name: shared-gateway
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - failedTemplate:
+          errorMessage: gateway.httpRoute.parentRefs requires hostname

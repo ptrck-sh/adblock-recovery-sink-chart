@@ -1,0 +1,21 @@
+{{- include "ars.validate" . -}}
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "ars.fullname" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "ars.labels" . | nindent 4 }}
+    {{- with .Values.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "ars.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: ops
+      path: /metrics
+      interval: {{ .Values.serviceMonitor.interval | quote }}
+{{- end }}

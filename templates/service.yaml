@@ -1,0 +1,54 @@
+{{- include "ars.validate" . -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ars.fullname" . }}-sink
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "ars.labels" . | nindent 4 }}
+    {{- with .Values.service.sink.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.service.sink.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.sink.type }}
+  {{- with .Values.service.sink.loadBalancerIP }}
+  loadBalancerIP: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.service.sink.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ . }}
+  {{- end }}
+  ports:
+    - name: sink
+      port: {{ .Values.service.sink.port }}
+      targetPort: sink
+      protocol: TCP
+  selector:
+    {{- include "ars.selectorLabels" . | nindent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ars.fullname" . }}-ops
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "ars.labels" . | nindent 4 }}
+    {{- with .Values.service.ops.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.service.ops.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: ops
+      port: {{ .Values.service.ops.port }}
+      targetPort: ops
+      protocol: TCP
+  selector:
+    {{- include "ars.selectorLabels" . | nindent 4 }}

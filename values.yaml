@@ -6,3 +6,148 @@ image:
 
 nameOverride: ""
 fullnameOverride: ""
+
+replicaCount: 1
+
+imagePullSecrets: []
+
+hostname: ""
+
+ingress:
+  enabled: true
+  kind: IngressRoute
+  className: ""
+  annotations: {}
+  hosts: []
+  tls: []
+  entryPoints:
+    - websecure
+  certResolver: ""
+  passthrough:
+    enabled: false
+    annotations: {}
+
+gateway:
+  enabled: false
+  annotations: {}
+  httpRoute:
+    parentRefs: []
+  tlsRoute:
+    parentRefs: []
+
+interception:
+  hosts:
+    - html-load.com
+
+profiles:
+  - adshield
+
+logLevel: info
+logFormat: json
+
+pki:
+  existingSecret: ""
+  keys:
+    rootCert: root.crt
+    intermediateCert: intermediate.crt
+    intermediateKey: intermediate.key
+
+serviceAccount:
+  create: true
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    memory: 64Mi
+
+containerPorts:
+  sink: 443
+  ops: 8443
+
+extraEnv: []
+
+strategy: {}
+priorityClassName: ""
+terminationGracePeriodSeconds: 30
+revisionHistoryLimit: 3
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: ops
+
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: ops
+  periodSeconds: 5
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+
+service:
+  sink:
+    type: ClusterIP
+    port: 443
+    loadBalancerIP: ""
+    annotations: {}
+    labels: {}
+    externalTrafficPolicy: ""
+  ops:
+    port: 8443
+    annotations: {}
+    labels: {}
+
+networkPolicy:
+  enabled: true
+  ingressFrom: []
+  metricsFrom: []
+
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  labels: {}
+
+certificate:
+  enabled: false
+  secretName: ""
+  issuerRef: {}
+
+vpa:
+  enabled: false
+  updateMode: "Off"
+  minAllowed: {}
+  maxAllowed: {}
+
+pdb:
+  enabled: false
+  minAvailable: 1
+
+hpa:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80

@@ -1,0 +1,27 @@
+suite: empty host validation
+templates:
+  - templates/configmap.yaml
+tests:
+  - it: fails for empty interception hosts
+    set:
+      pki.existingSecret: pki
+      interception.hosts: []
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - failedTemplate:
+          errorMessage: interception.hosts must contain at least one hostname
+
+  - it: fails for an empty public hostname in Ingress hosts
+    set:
+      pki.existingSecret: pki
+      ingress.enabled: true
+      ingress.hosts:
+        - host: ""
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - failedTemplate:
+          errorMessage: hostname must be a non-empty lowercase hostname
