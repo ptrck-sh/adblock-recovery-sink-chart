@@ -16,3 +16,4 @@ Thumbs.db
 
 # caches
 .cache/
+mise.local.toml

@@ -1,0 +1,116 @@
+{{- include "ars.validate" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ars.fullname" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "ars.labels" . | nindent 4 }}
+spec:
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  {{- with .Values.strategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- if not .Values.hpa.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "ars.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "ars.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      serviceAccountName: {{ include "ars.serviceAccountName" . }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- $podSecurityContext := deepCopy .Values.podSecurityContext }}
+      {{- $sysctls := list }}
+      {{- $lowestPort := min (int .Values.containerPorts.sink) (int .Values.containerPorts.ops) }}
+      {{- range $sysctl := .Values.podSecurityContext.sysctls }}
+      {{- if or (ge $lowestPort 1024) (ne $sysctl.name "net.ipv4.ip_unprivileged_port_start") }}
+      {{- $sysctls = append $sysctls $sysctl }}
+      {{- end }}
+      {{- end }}
+      {{- if lt $lowestPort 1024 }}
+      {{- $sysctls = append $sysctls (dict "name" "net.ipv4.ip_unprivileged_port_start" "value" (printf "%d" $lowestPort)) }}
+      {{- end }}
+      {{- if $sysctls }}
+      {{- $_ := set $podSecurityContext "sysctls" $sysctls }}
+      {{- end }}
+      securityContext:
+        {{- toYaml $podSecurityContext | nindent 8 }}
+      containers:
+        - name: sink
+          image: {{ include "ars.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: sink
+              containerPort: {{ .Values.containerPorts.sink }}
+              protocol: TCP
+            - name: ops
+              containerPort: {{ .Values.containerPorts.ops }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "ars.fullname" . }}
+          env:
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            - name: ARS_PKI_ROOT_CERT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.pki.existingSecret | quote }}
+                  key: {{ .Values.pki.keys.rootCert | quote }}
+            - name: ARS_PKI_INTERMEDIATE_CERT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.pki.existingSecret | quote }}
+                  key: {{ .Values.pki.keys.intermediateCert | quote }}
+            - name: ARS_PKI_INTERMEDIATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.pki.existingSecret | quote }}
+                  key: {{ .Values.pki.keys.intermediateKey | quote }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

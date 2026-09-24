@@ -35,3 +35,21 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s:%s" .Values.image.repository $tag -}}
 {{- end -}}
 {{- end -}}
+
+{{- define "ars.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create -}}
+{{- default (include "ars.fullname" .) .Values.serviceAccount.name -}}
+{{- else -}}
+{{- default "default" .Values.serviceAccount.name -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "ars.tlsSecretName" -}}
+{{- default (printf "%s-tls" (include "ars.fullname" .)) .Values.certificate.secretName -}}
+{{- end -}}
+
+{{- define "ars.sniMatch" -}}
+{{- range $index, $host := .Values.interception.hosts -}}
+{{- if $index }} || {{ end -}}HostSNI(`{{ $host }}`)
+{{- end -}}
+{{- end -}}

@@ -1,0 +1,390 @@
+suite: core resources and validation
+release:
+  name: rel
+  namespace: test
+tests:
+  - it: wires the PKI keys as individual Secret references
+    templates:
+      - templates/deployment.yaml
+    set:
+      pki.existingSecret: pki
+      pki.keys.rootCert: ca-root
+      pki.keys.intermediateCert: ca-intermediate
+      pki.keys.intermediateKey: issuer-key
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[0].valueFrom.secretKeyRef.name
+          value: pki
+      - equal:
+          path: spec.template.spec.containers[0].env[0].valueFrom.secretKeyRef.key
+          value: ca-root
+      - equal:
+          path: spec.template.spec.containers[0].env[1].valueFrom.secretKeyRef.key
+          value: ca-intermediate
+      - equal:
+          path: spec.template.spec.containers[0].env[2].valueFrom.secretKeyRef.key
+          value: issuer-key
+
+  - it: renders the app environment ConfigMap
+    templates:
+      - templates/configmap.yaml
+    set:
+      pki.existingSecret: pki
+      interception.hosts:
+        - html-load.com
+        - assets.example.net
+      profiles:
+        - adshield
+        - fallback
+      hostname: status.example.com
+      logLevel: debug
+      logFormat: text
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - equal:
+          path: data.ARS_SINK_ADDR
+          value: ":443"
+      - equal:
+          path: data.ARS_OPS_ADDR
+          value: ":8443"
+      - equal:
+          path: data.ARS_HOSTS
+          value: html-load.com,assets.example.net
+      - equal:
+          path: data.ARS_PROFILES
+          value: adshield,fallback
+      - equal:
+          path: data.ARS_HOSTNAME
+          value: status.example.com
+      - equal:
+          path: data.ARS_LOG_LEVEL
+          value: debug
+
+  - it: renders configured addresses in the ConfigMap
+    templates:
+      - templates/configmap.yaml
+    set:
+      pki.existingSecret: pki
+      containerPorts.sink: 9443
+      containerPorts.ops: 9090
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - equal:
+          path: data.ARS_SINK_ADDR
+          value: ":9443"
+        documentIndex: 0
+      - equal:
+          path: data.ARS_OPS_ADDR
+          value: ":9090"
+
+  - it: renders configured container ports
+    templates:
+      - templates/deployment.yaml
+    set:
+      pki.existingSecret: pki
+      containerPorts.sink: 9443
+      containerPorts.ops: 9090
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 9443
+      - equal:
+          path: spec.template.spec.containers[0].ports[1].containerPort
+          value: 9090
+
+  - it: renders the default ports and non-root binding sysctl
+    templates:
+      - templates/deployment.yaml
+    set:
+      pki.existingSecret: pki
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 443
+      - equal:
+          path: spec.template.spec.containers[0].ports[1].containerPort
+          value: 8443
+      - equal:
+          path: spec.template.spec.securityContext.sysctls[0].name
+          value: net.ipv4.ip_unprivileged_port_start
+      - equal:
+          path: spec.template.spec.securityContext.sysctls[0].value
+          value: "443"
+
+  - it: renders the default service ports
+    templates:
+      - templates/service.yaml
+    set:
+      pki.existingSecret: pki
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 443
+        documentIndex: 0
+      - equal:
+          path: spec.ports[0].port
+          value: 8443
+        documentIndex: 1
+
+  - it: omits the chart sysctl when all container ports are unprivileged
+    templates:
+      - templates/deployment.yaml
+    set:
+      pki.existingSecret: pki
+      containerPorts.sink: 10443
+      containerPorts.ops: 18443
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - notExists:
+          path: spec.template.spec.securityContext.sysctls
+
+  - it: merges configured sysctls while the chart sysctl wins
+    templates:
+      - templates/deployment.yaml
+    set:
+      pki.existingSecret: pki
+      podSecurityContext.sysctls:
+        - name: kernel.shm_rmid_forced
+          value: "1"
+        - name: net.ipv4.ip_unprivileged_port_start
+          value: "1"
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - contains:
+          path: spec.template.spec.securityContext.sysctls
+          content:
+            name: kernel.shm_rmid_forced
+            value: "1"
+      - contains:
+          path: spec.template.spec.securityContext.sysctls
+          content:
+            name: net.ipv4.ip_unprivileged_port_start
+            value: "443"
+
+  - it: renders a hardened volume-free pod
+    templates:
+      - templates/deployment.yaml
+    set:
+      pki.existingSecret: pki
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 65532
+      - equal:
+          path: spec.template.spec.securityContext.seccompProfile.type
+          value: RuntimeDefault
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - contains:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          content: ALL
+      - notExists:
+          path: spec.template.spec.volumes
+
+  - it: denies all egress by default
+    templates:
+      - templates/networkpolicy.yaml
+    set:
+      pki.existingSecret: pki
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - equal:
+          path: spec.egress
+          value: []
+      - contains:
+          path: spec.policyTypes
+          content: Egress
+
+  - it: allows all ingress by default
+    templates:
+      - templates/networkpolicy.yaml
+    set:
+      pki.existingSecret: pki
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - notExists:
+          path: spec.ingress[0].from
+      - notExists:
+          path: spec.ingress[1].from
+
+  - it: restricts ingress and metrics peers when ingress peers are configured
+    templates:
+      - templates/networkpolicy.yaml
+    set:
+      pki.existingSecret: pki
+      networkPolicy.ingressFrom:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: routing
+      networkPolicy.metricsFrom:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - equal:
+          path: spec.ingress[0].from[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+          value: routing
+      - equal:
+          path: spec.ingress[1].from[1].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+          value: monitoring
+
+  - it: renders deployment runtime configuration
+    templates:
+      - templates/deployment.yaml
+    set:
+      pki.existingSecret: pki
+      extraEnv:
+        - name: ARS_LIMITS_SHUTDOWN_DELAY
+          value: 10s
+      strategy:
+        type: Recreate
+      priorityClassName: high-priority
+      terminationGracePeriodSeconds: 45
+      revisionHistoryLimit: 7
+      livenessProbe:
+        httpGet:
+          path: /live
+          port: ops
+        initialDelaySeconds: 3
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: ops
+        periodSeconds: 9
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - equal:
+          path: spec.revisionHistoryLimit
+          value: 7
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+      - equal:
+          path: spec.template.spec.priorityClassName
+          value: high-priority
+      - equal:
+          path: spec.template.spec.terminationGracePeriodSeconds
+          value: 45
+      - equal:
+          path: spec.template.spec.containers[0].env[0].name
+          value: ARS_LIMITS_SHUTDOWN_DELAY
+      - equal:
+          path: spec.template.spec.containers[0].env[1].name
+          value: ARS_PKI_ROOT_CERT
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /live
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.initialDelaySeconds
+          value: 3
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /ready
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.periodSeconds
+          value: 9
+
+  - it: renders default deployment probes and history
+    templates:
+      - templates/deployment.yaml
+    set:
+      pki.existingSecret: pki
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - equal:
+          path: spec.revisionHistoryLimit
+          value: 3
+      - equal:
+          path: spec.template.spec.terminationGracePeriodSeconds
+          value: 30
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /healthz
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /readyz
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.periodSeconds
+          value: 5
+
+  - it: merges service labels and annotations with configured ports
+    templates:
+      - templates/service.yaml
+    set:
+      pki.existingSecret: pki
+      service.sink.port: 10443
+      service.sink.labels:
+        exposure: external
+      service.ops.port: 18080
+      service.ops.labels:
+        component: metrics
+      service.ops.annotations:
+        example.com/scrape: enabled
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - equal:
+          path: metadata.labels.exposure
+          value: external
+        documentIndex: 0
+      - equal:
+          path: spec.ports[0].port
+          value: 10443
+        documentIndex: 0
+      - equal:
+          path: metadata.labels.component
+          value: metrics
+        documentIndex: 1
+      - equal:
+          path: metadata.annotations["example.com/scrape"]
+          value: enabled
+        documentIndex: 1
+      - equal:
+          path: spec.ports[0].port
+          value: 18080
+        documentIndex: 1

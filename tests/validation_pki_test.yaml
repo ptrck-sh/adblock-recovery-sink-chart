@@ -1,0 +1,11 @@
+suite: PKI validation
+templates:
+  - templates/deployment.yaml
+tests:
+  - it: fails without the externally managed PKI Secret name
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - failedTemplate:
+          errorMessage: pki.existingSecret must name an externally managed Secret
