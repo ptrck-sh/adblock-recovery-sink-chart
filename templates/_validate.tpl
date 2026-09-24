@@ -28,20 +28,21 @@
 {{- if not $host -}}
 {{- fail "interception.hosts entries must be non-empty lowercase hostnames" -}}
 {{- end -}}
-{{- if contains "*" $host -}}
-{{- fail (printf "interception.hosts entry %q must not contain a wildcard" $host) -}}
+{{- $name := trimPrefix "*." $host -}}
+{{- if contains "*" $name -}}
+{{- fail (printf "interception.hosts entry %q may only use a leading *. wildcard" $host) -}}
 {{- end -}}
-{{- if hasPrefix "." $host -}}
+{{- if hasPrefix "." $name -}}
 {{- fail (printf "interception.hosts entry %q must not begin with a dot" $host) -}}
 {{- end -}}
-{{- if not (contains "." $host) -}}
+{{- if not (contains "." $name) -}}
 {{- fail (printf "interception.hosts entry %q must contain a dot" $host) -}}
 {{- end -}}
 {{- if ne $host (lower $host) -}}
 {{- fail (printf "interception.hosts entry %q must be lowercase" $host) -}}
 {{- end -}}
-{{- if not (regexMatch "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$" $host) -}}
-{{- fail (printf "interception.hosts entry %q must be an exact hostname" $host) -}}
+{{- if not (regexMatch "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$" $name) -}}
+{{- fail (printf "interception.hosts entry %q must be a hostname or *. followed by a hostname" $host) -}}
 {{- end -}}
 {{- end -}}
 {{- if .Values.hostname -}}

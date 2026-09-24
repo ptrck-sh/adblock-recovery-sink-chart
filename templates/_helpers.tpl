@@ -50,6 +50,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 {{- define "ars.sniMatch" -}}
 {{- range $index, $host := .Values.interception.hosts -}}
-{{- if $index }} || {{ end -}}HostSNI(`{{ $host }}`)
+{{- if $index }} || {{ end -}}
+{{- if hasPrefix "*." $host -}}
+HostSNIRegexp(`^.+\.{{ trimPrefix "*." $host | replace "." "\\." }}$`)
+{{- else -}}
+HostSNI(`{{ $host }}`)
+{{- end -}}
 {{- end -}}
 {{- end -}}

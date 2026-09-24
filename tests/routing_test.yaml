@@ -20,7 +20,7 @@ tests:
           name: rel-adblock-recovery-sink-sink
       - equal:
           path: spec.routes[0].match
-          value: HostSNI(`html-load.com`) || HostSNI(`fb.html-load.com`) || HostSNI(`1.s.html-load.com`) || HostSNI(`3.s.html-load.com`) || HostSNI(`8.s.html-load.com`) || HostSNI(`content-loader.com`) || HostSNI(`fb.content-loader.com`) || HostSNI(`1.content-loader.com`) || HostSNI(`2.content-loader.com`) || HostSNI(`js-loader.com`) || HostSNI(`css-load.com`) || HostSNI(`d37j8pfxu2iogi.cloudfront.net`) || HostSNI(`dkyerkk91s4fa.cloudfront.net`)
+          value: HostSNI(`html-load.com`) || HostSNIRegexp(`^.+\.html-load\.com$`) || HostSNI(`content-loader.com`) || HostSNIRegexp(`^.+\.content-loader\.com$`) || HostSNI(`js-loader.com`) || HostSNIRegexp(`^.+\.js-loader\.com$`) || HostSNI(`css-load.com`) || HostSNIRegexp(`^.+\.css-load\.com$`) || HostSNI(`d37j8pfxu2iogi.cloudfront.net`) || HostSNI(`dkyerkk91s4fa.cloudfront.net`)
       - equal:
           path: spec.routes[0].services[0].port
           value: 443
