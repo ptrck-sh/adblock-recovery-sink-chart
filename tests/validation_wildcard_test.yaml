@@ -2,17 +2,43 @@ suite: wildcard host validation
 templates:
   - templates/configmap.yaml
 tests:
-  - it: fails for wildcard interception hosts
+  - it: accepts a leading wildcard interception host
     set:
       pki.existingSecret: pki
       interception.hosts:
+        - example.com
         - "*.example.com"
     capabilities:
       apiVersions:
         - traefik.io/v1alpha1
     asserts:
+      - equal:
+          path: data.ARS_HOSTS
+          value: example.com,*.example.com
+
+  - it: fails for a wildcard that is not a leading label
+    set:
+      pki.existingSecret: pki
+      interception.hosts:
+        - "a.*.example.com"
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
       - failedTemplate:
-          errorMessage: interception.hosts entry "*.example.com" must not contain a wildcard
+          errorMessage: interception.hosts entry "a.*.example.com" may only use a leading *. wildcard
+
+  - it: fails for a partial label wildcard
+    set:
+      pki.existingSecret: pki
+      interception.hosts:
+        - "*example.com"
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - failedTemplate:
+          errorMessage: interception.hosts entry "*example.com" may only use a leading *. wildcard
 
   - it: fails for a wildcard public hostname
     set:

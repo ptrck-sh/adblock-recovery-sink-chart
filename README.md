@@ -1,12 +1,20 @@
 # adblock-recovery-sink-chart
 
-![Version: 0.2.0](https://img.shields.io/badge/Version-0.2.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.1.1](https://img.shields.io/badge/AppVersion-0.1.1-informational?style=flat-square)
+![Version: 0.3.0](https://img.shields.io/badge/Version-0.3.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.2.0](https://img.shields.io/badge/AppVersion-0.2.0-informational?style=flat-square)
 
 Helm chart for [adblock-recovery-sink](https://gitlab.com/ptrck-sh/adblock-recovery-sink), which serves harmless replacements for known anti-adblock loader resources behind DNS rewrites that you manage on your LAN resolver.
 
 Setup, PKI and enrollment, DNS rewrites, Chrome Local Network Access and troubleshooting are covered in the [application documentation](https://ptrck-sh.gitlab.io/adblock-recovery-sink). This README documents the chart values only.
 
 The chart mounts no volumes. Application configuration is supplied only through environment variables.
+
+## Intercepted hosts
+
+`interception.hosts` lists every known Ad-Shield loader domain. It drives the passthrough routes and `ARS_HOSTS`. Entries may start with `*.` to match every subdomain; Traefik routes them with `HostSNIRegexp` at any depth and Gateway `TLSRoute` hostnames match them as suffixes, while a Kubernetes `Ingress` wildcard matches a single label only, so list deeper names such as `1.s.html-load.com` explicitly there. The sink serves only the hosts its CA name constraints permit and logs the rest as skipped, so a CA created for `html-load.com` alone keeps working and covers `html-load.com` and its subdomains. Create a CA for all loader domains to cover the full list, and add a DNS rewrite for each host you want intercepted.
+
+## Toast
+
+`toast.enabled` appends a small notice to each served loader that appears in the top-right corner when the sink answers the page's handshake. `toast.details` adds the host and path of the neutralized script. Both default to `false`.
 
 ## Routing
 
@@ -120,7 +128,7 @@ Set `pki.existingSecret` to an externally managed Secret containing `root.crt`, 
 
 ## NetworkPolicy
 
-NetworkPolicy is enabled by default. It allows ingress on the sink and ops ports from any source unless `networkPolicy.ingressFrom` is configured, and denies all egress, including DNS.
+NetworkPolicy is enabled by default. It allows ingress on the sink and ops ports from any source unless `networkPolicy.ingressFrom` is configured, and denies all egress, including DNS. `networkPolicy.metricsFrom` adds peers to the ops port only when `ingressFrom` is set, because the ops port also serves the public web routes; with an empty `ingressFrom` both ports already accept any source.
 
 ## Values
 
@@ -159,6 +167,15 @@ NetworkPolicy is enabled by default. It allows ingress on the sink and ops ports
 | ingress.passthrough.enabled | bool | `false` |  |
 | ingress.tls | list | `[]` |  |
 | interception.hosts[0] | string | `"html-load.com"` |  |
+| interception.hosts[1] | string | `"*.html-load.com"` |  |
+| interception.hosts[2] | string | `"content-loader.com"` |  |
+| interception.hosts[3] | string | `"*.content-loader.com"` |  |
+| interception.hosts[4] | string | `"js-loader.com"` |  |
+| interception.hosts[5] | string | `"*.js-loader.com"` |  |
+| interception.hosts[6] | string | `"css-load.com"` |  |
+| interception.hosts[7] | string | `"*.css-load.com"` |  |
+| interception.hosts[8] | string | `"d37j8pfxu2iogi.cloudfront.net"` |  |
+| interception.hosts[9] | string | `"dkyerkk91s4fa.cloudfront.net"` |  |
 | livenessProbe.httpGet.path | string | `"/healthz"` |  |
 | livenessProbe.httpGet.port | string | `"ops"` |  |
 | logFormat | string | `"json"` |  |
@@ -210,6 +227,8 @@ NetworkPolicy is enabled by default. It allows ingress on the sink and ops ports
 | serviceMonitor.labels | object | `{}` |  |
 | strategy | object | `{}` |  |
 | terminationGracePeriodSeconds | int | `30` |  |
+| toast.details | bool | `false` |  |
+| toast.enabled | bool | `false` |  |
 | tolerations | list | `[]` |  |
 | topologySpreadConstraints | list | `[]` |  |
 | vpa.enabled | bool | `false` |  |

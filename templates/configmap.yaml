@@ -11,6 +11,8 @@ data:
   ARS_OPS_ADDR: {{ printf ":%v" .Values.containerPorts.ops | quote }}
   ARS_HOSTS: {{ join "," .Values.interception.hosts | quote }}
   ARS_PROFILES: {{ join "," .Values.profiles | quote }}
+  ARS_TOAST_ENABLED: {{ .Values.toast.enabled | toString | quote }}
+  ARS_TOAST_DETAILS: {{ .Values.toast.details | toString | quote }}
   ARS_LOG_LEVEL: {{ .Values.logLevel | quote }}
   ARS_LOG_FORMAT: {{ .Values.logFormat | quote }}
   {{- with .Values.hostname }}
