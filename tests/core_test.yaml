@@ -42,6 +42,8 @@ tests:
       hostname: status.example.com
       logLevel: debug
       logFormat: text
+      toast.enabled: true
+      toast.details: true
     capabilities:
       apiVersions:
         - traefik.io/v1alpha1
@@ -64,6 +66,12 @@ tests:
       - equal:
           path: data.ARS_LOG_LEVEL
           value: debug
+      - equal:
+          path: data.ARS_TOAST_ENABLED
+          value: "true"
+      - equal:
+          path: data.ARS_TOAST_DETAILS
+          value: "true"
 
   - it: renders configured addresses in the ConfigMap
     templates:
@@ -267,6 +275,27 @@ tests:
       - equal:
           path: spec.ingress[1].from[1].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
           value: monitoring
+
+  - it: keeps both ports open when only metrics peers are configured
+    templates:
+      - templates/networkpolicy.yaml
+    set:
+      pki.existingSecret: pki
+      networkPolicy.metricsFrom:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - notExists:
+          path: spec.ingress[0].from
+      - notExists:
+          path: spec.ingress[1].from
+      - equal:
+          path: spec.egress
+          value: []
 
   - it: renders deployment runtime configuration
     templates:

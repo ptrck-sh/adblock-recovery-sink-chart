@@ -8,6 +8,14 @@ Setup, PKI and enrollment, DNS rewrites, Chrome Local Network Access and trouble
 
 The chart mounts no volumes. Application configuration is supplied only through environment variables.
 
+## Intercepted hosts
+
+`interception.hosts` lists every known Ad-Shield loader domain. It drives the passthrough routes and `ARS_HOSTS`. Entries may start with `*.` to match every subdomain; Traefik routes them with `HostSNIRegexp` at any depth and Gateway `TLSRoute` hostnames match them as suffixes, while a Kubernetes `Ingress` wildcard matches a single label only, so list deeper names such as `1.s.html-load.com` explicitly there. The sink serves only the hosts its CA name constraints permit and logs the rest as skipped, so a CA created for `html-load.com` alone keeps working and covers `html-load.com` and its subdomains. Create a CA for all loader domains to cover the full list, and add a DNS rewrite for each host you want intercepted.
+
+## Toast
+
+`toast.enabled` appends a small notice to each served loader that appears in the top-right corner when the sink answers the page's handshake. `toast.details` adds the host and path of the neutralized script. Both default to `false`.
+
 ## Routing
 
 TLS interception and the public web hostname are configured separately. The sink listens on TLS port 443; the plain HTTP ops listener is port 8443. The chart sets `net.ipv4.ip_unprivileged_port_start` to the lowest container port below 1024 so the non-root container can bind it. Additional pod sysctls can be set with `podSecurityContext.sysctls`.
@@ -120,7 +128,7 @@ Set `pki.existingSecret` to an externally managed Secret containing `root.crt`, 
 
 ## NetworkPolicy
 
-NetworkPolicy is enabled by default. It allows ingress on the sink and ops ports from any source unless `networkPolicy.ingressFrom` is configured, and denies all egress, including DNS.
+NetworkPolicy is enabled by default. It allows ingress on the sink and ops ports from any source unless `networkPolicy.ingressFrom` is configured, and denies all egress, including DNS. `networkPolicy.metricsFrom` adds peers to the ops port only when `ingressFrom` is set, because the ops port also serves the public web routes; with an empty `ingressFrom` both ports already accept any source.
 
 {{ template "chart.valuesSection" . }}
 

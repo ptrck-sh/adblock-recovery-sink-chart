@@ -38,9 +38,22 @@ gateway:
 interception:
   hosts:
     - html-load.com
+    - "*.html-load.com"
+    - content-loader.com
+    - "*.content-loader.com"
+    - js-loader.com
+    - "*.js-loader.com"
+    - css-load.com
+    - "*.css-load.com"
+    - d37j8pfxu2iogi.cloudfront.net
+    - dkyerkk91s4fa.cloudfront.net
 
 profiles:
   - adshield
+
+toast:
+  enabled: false
+  details: false
 
 logLevel: info
 logFormat: json
