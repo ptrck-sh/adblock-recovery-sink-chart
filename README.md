@@ -169,6 +169,7 @@ NetworkPolicy is enabled by default. It allows ingress on the sink and ops ports
 | interception.hosts[0] | string | `"html-load.com"` |  |
 | interception.hosts[10] | string | `"css-load.com"` |  |
 | interception.hosts[11] | string | `"d37j8pfxu2iogi.cloudfront.net"` |  |
+| interception.hosts[12] | string | `"dkyerkk91s4fa.cloudfront.net"` |  |
 | interception.hosts[1] | string | `"fb.html-load.com"` |  |
 | interception.hosts[2] | string | `"1.s.html-load.com"` |  |
 | interception.hosts[3] | string | `"3.s.html-load.com"` |  |
