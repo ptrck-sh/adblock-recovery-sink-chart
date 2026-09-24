@@ -69,6 +69,60 @@ tests:
           value: enrollment-tls
         documentIndex: 1
 
+  - it: uses enrollment Traefik settings and service ports
+    templates:
+      - templates/routing.yaml
+    set:
+      pki.existingSecret: pki
+      enrollment.host: enroll.example.com
+      service.sink.port: 10443
+      service.ops.port: 18080
+      routing.traefik.enrollmentEntryPoints:
+        - enrollment
+      routing.traefik.certResolver: example-resolver
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - equal:
+          path: spec.routes[0].services[0].port
+          value: 10443
+        documentIndex: 0
+      - equal:
+          path: spec.entryPoints[0]
+          value: enrollment
+        documentIndex: 1
+      - equal:
+          path: spec.routes[0].services[0].port
+          value: 18080
+        documentIndex: 1
+      - equal:
+          path: spec.tls.certResolver
+          value: example-resolver
+        documentIndex: 1
+      - notExists:
+          path: spec.tls.secretName
+        documentIndex: 1
+
+  - it: falls back to default enrollment Traefik settings and Secret name
+    templates:
+      - templates/routing.yaml
+    set:
+      pki.existingSecret: pki
+      enrollment.host: enroll.example.com
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - equal:
+          path: spec.entryPoints[0]
+          value: websecure
+        documentIndex: 1
+      - equal:
+          path: spec.tls.secretName
+          value: rel-adblock-recovery-sink-enrollment-tls
+        documentIndex: 1
+
   - it: renders Gateway API routes
     templates:
       - templates/routing.yaml
@@ -97,6 +151,10 @@ tests:
           path: spec.rules[4].matches[0].path.value
           value: /fingerprint
         documentIndex: 1
+      - equal:
+          path: spec.rules[0].backendRefs[0].port
+          value: 443
+        documentIndex: 0
 
   - it: renders enrollment Ingress mode with a LoadBalancer sink
     templates:
@@ -118,3 +176,50 @@ tests:
       - equal:
           path: spec.rules[0].http.paths[4].path
           value: /fingerprint
+      - equal:
+          path: spec.tls[0].secretName
+          value: enrollment-tls
+
+  - it: renders custom Gateway backend ports
+    templates:
+      - templates/routing.yaml
+    set:
+      pki.existingSecret: pki
+      routing.mode: gateway
+      routing.gateway.tlsParentRefs:
+        - name: shared-gateway
+      routing.gateway.httpParentRefs:
+        - name: shared-gateway
+      enrollment.host: enroll.example.com
+      service.sink.port: 10443
+      service.ops.port: 18080
+    capabilities:
+      apiVersions:
+        - gateway.networking.k8s.io/v1alpha2/TLSRoute
+        - gateway.networking.k8s.io/v1/HTTPRoute
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs[0].port
+          value: 10443
+        documentIndex: 0
+      - equal:
+          path: spec.rules[0].backendRefs[0].port
+          value: 18080
+        documentIndex: 1
+
+  - it: renders custom Ingress backend port and generated Secret name
+    templates:
+      - templates/routing.yaml
+    set:
+      pki.existingSecret: pki
+      routing.mode: ingress
+      service.sink.type: LoadBalancer
+      service.ops.port: 18080
+      enrollment.host: enroll.example.com
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.port.number
+          value: 18080
+      - equal:
+          path: spec.tls[0].secretName
+          value: rel-adblock-recovery-sink-enrollment-tls

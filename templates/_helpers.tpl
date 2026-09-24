@@ -44,6 +44,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 {{- end -}}
 
+{{- define "ars.enrollmentTLSSecretName" -}}
+{{- default (printf "%s-enrollment-tls" (include "ars.fullname" .)) .Values.enrollment.tls.secretName -}}
+{{- end -}}
+
 {{- define "ars.sniMatch" -}}
 {{- range $index, $host := .Values.interception.hosts -}}
 {{- if $index }} || {{ end -}}HostSNI(`{{ $host }}`)

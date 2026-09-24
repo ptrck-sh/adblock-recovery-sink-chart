@@ -7,8 +7,8 @@ metadata:
   labels:
     {{- include "ars.labels" . | nindent 4 }}
 data:
-  ARS_SINK_ADDR: ":8443"
-  ARS_OPS_ADDR: ":8080"
+  ARS_SINK_ADDR: {{ printf ":%v" .Values.containerPorts.sink | quote }}
+  ARS_OPS_ADDR: {{ printf ":%v" .Values.containerPorts.ops | quote }}
   ARS_HOSTS: {{ join "," .Values.interception.hosts | quote }}
   ARS_PROFILES: {{ join "," .Values.profiles | quote }}
   ARS_LOG_LEVEL: {{ .Values.logLevel | quote }}

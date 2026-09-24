@@ -7,6 +7,11 @@ metadata:
   labels:
     {{- include "ars.labels" . | nindent 4 }}
 spec:
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  {{- with .Values.strategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   {{- if not .Values.hpa.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
@@ -28,6 +33,10 @@ spec:
     spec:
       automountServiceAccountToken: false
       serviceAccountName: {{ include "ars.serviceAccountName" . }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -42,15 +51,18 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           ports:
             - name: sink
-              containerPort: 8443
+              containerPort: {{ .Values.containerPorts.sink }}
               protocol: TCP
             - name: ops
-              containerPort: 8080
+              containerPort: {{ .Values.containerPorts.ops }}
               protocol: TCP
           envFrom:
             - configMapRef:
                 name: {{ include "ars.fullname" . }}
           env:
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
             - name: ARS_PKI_ROOT_CERT
               valueFrom:
                 secretKeyRef:
@@ -67,13 +79,9 @@ spec:
                   name: {{ .Values.pki.existingSecret | quote }}
                   key: {{ .Values.pki.keys.intermediateKey | quote }}
           livenessProbe:
-            httpGet:
-              path: /healthz
-              port: ops
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
           readinessProbe:
-            httpGet:
-              path: /readyz
-              port: ops
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}

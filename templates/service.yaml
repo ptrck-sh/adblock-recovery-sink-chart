@@ -6,6 +6,9 @@ metadata:
   namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "ars.labels" . | nindent 4 }}
+    {{- with .Values.service.sink.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
   {{- with .Values.service.sink.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -20,7 +23,7 @@ spec:
   {{- end }}
   ports:
     - name: sink
-      port: 443
+      port: {{ .Values.service.sink.port }}
       targetPort: sink
       protocol: TCP
   selector:
@@ -33,11 +36,18 @@ metadata:
   namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "ars.labels" . | nindent 4 }}
+    {{- with .Values.service.ops.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.service.ops.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   type: ClusterIP
   ports:
     - name: ops
-      port: 8080
+      port: {{ .Values.service.ops.port }}
       targetPort: ops
       protocol: TCP
   selector:

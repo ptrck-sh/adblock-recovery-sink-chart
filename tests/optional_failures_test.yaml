@@ -1,7 +1,19 @@
 suite: optional resource failures
 templates:
-  - templates/hpa.yaml
+  - templates/configmap.yaml
 tests:
+  - it: fails extra environment PKI overrides
+    set:
+      pki.existingSecret: pki
+      extraEnv[0].name: ARS_PKI_ROOT_CERT
+      extraEnv[0].value: overridden
+    capabilities:
+      apiVersions:
+        - traefik.io/v1alpha1
+    asserts:
+      - failedTemplate:
+          errorMessage: extraEnv entries must not use names beginning with ARS_PKI_
+
   - it: fails active HPA and VPA together
     set:
       pki.existingSecret: pki

@@ -18,7 +18,7 @@ spec:
     - match: {{ include "ars.sniMatch" . | quote }}
       services:
         - name: {{ include "ars.fullname" . }}-sink
-          port: 443
+          port: {{ .Values.service.sink.port }}
   tls:
     passthrough: true
 {{- if .Values.enrollment.host }}
@@ -36,15 +36,19 @@ metadata:
   {{- end }}
 spec:
   entryPoints:
-    {{- toYaml .Values.routing.traefik.entryPoints | nindent 4 }}
+    {{- toYaml (default .Values.routing.traefik.entryPoints .Values.routing.traefik.enrollmentEntryPoints) | nindent 4 }}
   routes:
     - match: {{ include "ars.enrollmentMatch" . | quote }}
       kind: Rule
       services:
         - name: {{ include "ars.fullname" . }}-ops
-          port: 8080
+          port: {{ .Values.service.ops.port }}
   tls:
-    secretName: {{ .Values.enrollment.tls.secretName | quote }}
+    {{- if .Values.routing.traefik.certResolver }}
+    certResolver: {{ .Values.routing.traefik.certResolver | quote }}
+    {{- else }}
+    secretName: {{ include "ars.enrollmentTLSSecretName" . | quote }}
+    {{- end }}
 {{- end }}
 {{- else if eq .Values.routing.mode "gateway" }}
 apiVersion: gateway.networking.k8s.io/v1alpha2
@@ -62,7 +66,7 @@ spec:
   rules:
     - backendRefs:
         - name: {{ include "ars.fullname" . }}-sink
-          port: 443
+          port: {{ .Values.service.sink.port }}
 {{- if .Values.enrollment.host }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
@@ -85,7 +89,7 @@ spec:
             value: {{ $path | quote }}
       backendRefs:
         - name: {{ include "ars.fullname" $ }}-ops
-          port: 8080
+          port: {{ $.Values.service.ops.port }}
     {{- end }}
 {{- end }}
 {{- else if and (eq .Values.routing.mode "ingress") .Values.enrollment.host }}
@@ -107,7 +111,7 @@ spec:
   tls:
     - hosts:
         - {{ .Values.enrollment.host | quote }}
-      secretName: {{ .Values.enrollment.tls.secretName | quote }}
+      secretName: {{ include "ars.enrollmentTLSSecretName" . | quote }}
   rules:
     - host: {{ .Values.enrollment.host | quote }}
       http:
@@ -119,6 +123,6 @@ spec:
               service:
                 name: {{ include "ars.fullname" $ }}-ops
                 port:
-                  number: 8080
+                  number: {{ $.Values.service.ops.port }}
           {{- end }}
 {{- end }}

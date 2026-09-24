@@ -15,15 +15,19 @@ spec:
     - Ingress
     - Egress
   ingress:
-    - from:
-        {{- toYaml .Values.networkPolicy.ingressFrom | nindent 8 }}
-      ports:
+    - ports:
         - protocol: TCP
           port: sink
-    - from:
-        {{- toYaml (concat .Values.networkPolicy.ingressFrom .Values.networkPolicy.metricsFrom) | nindent 8 }}
-      ports:
+      {{- with .Values.networkPolicy.ingressFrom }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    - ports:
         - protocol: TCP
           port: ops
+      {{- with .Values.networkPolicy.ingressFrom }}
+      from:
+        {{- toYaml (concat . $.Values.networkPolicy.metricsFrom) | nindent 8 }}
+      {{- end }}
   egress: []
 {{- end }}

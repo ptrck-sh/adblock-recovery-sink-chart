@@ -8,7 +8,7 @@ metadata:
   labels:
     {{- include "ars.labels" . | nindent 4 }}
 spec:
-  secretName: {{ .Values.enrollment.tls.secretName | quote }}
+  secretName: {{ include "ars.enrollmentTLSSecretName" . | quote }}
   issuerRef:
     {{- toYaml .Values.certificate.issuerRef | nindent 4 }}
   dnsNames:

@@ -16,13 +16,63 @@ The chart mounts no volumes. Application configuration is supplied only through 
 
 Enrollment routes are created only when `enrollment.host` is set. They expose only the enrollment paths.
 
+## Configuration
+
+Defaults are cluster-neutral. Configure routing integrations and allowed network peers for the cluster where the chart runs.
+
+A k3s installation using the bundled Traefik can restrict sink and ops access to Traefik in `kube-system`:
+
+```yaml
+networkPolicy:
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
+```
+
+If Traefik filters CRDs by ingress class, set its matching annotation:
+
+```yaml
+routing:
+  traefik:
+    annotations:
+      kubernetes.io/ingress.class: traefik-example
+```
+
+For enrollment TLS, let Traefik resolve certificates or enable cert-manager with an issuer:
+
+```yaml
+routing:
+  traefik:
+    certResolver: example-resolver
+```
+
+```yaml
+certificate:
+  enabled: true
+  issuerRef:
+    name: example-issuer
+    kind: ClusterIssuer
+```
+
+Supply additional application configuration with `extraEnv`:
+
+```yaml
+extraEnv:
+  - name: ARS_LIMITS_SHUTDOWN_DELAY
+    value: 10s
+```
+
 ## PKI Secret
 
 Set `pki.existingSecret` to an externally managed Secret containing `root.crt`, `intermediate.crt`, and `intermediate.key` by default. Override those key names with `pki.keys`. The chart never creates this Secret. Its values are consumed as individual environment variables. Secret changes require an explicit Deployment rollout.
 
 ## NetworkPolicy
 
-NetworkPolicy is enabled by default. It allows ingress from the configured routing peers and denies all egress, including DNS.
+NetworkPolicy is enabled by default. It allows ingress on the sink and ops ports from any source unless `networkPolicy.ingressFrom` is configured, and denies all egress, including DNS.
 
 ## Values
 
@@ -31,8 +81,11 @@ NetworkPolicy is enabled by default. It allows ingress from the configured routi
 | affinity | object | `{}` |  |
 | certificate.enabled | bool | `false` |  |
 | certificate.issuerRef | object | `{}` |  |
+| containerPorts.ops | int | `8080` |  |
+| containerPorts.sink | int | `8443` |  |
 | enrollment.host | string | `""` |  |
-| enrollment.tls.secretName | string | `"adblock-recovery-sink-enrollment-tls"` |  |
+| enrollment.tls.secretName | string | `""` |  |
+| extraEnv | list | `[]` |  |
 | fullnameOverride | string | `""` |  |
 | hpa.enabled | bool | `false` |  |
 | hpa.maxReplicas | int | `3` |  |
@@ -44,11 +97,13 @@ NetworkPolicy is enabled by default. It allows ingress from the configured routi
 | image.tag | string | `""` |  |
 | imagePullSecrets | list | `[]` |  |
 | interception.hosts[0] | string | `"html-load.com"` |  |
+| livenessProbe.httpGet.path | string | `"/healthz"` |  |
+| livenessProbe.httpGet.port | string | `"ops"` |  |
 | logFormat | string | `"json"` |  |
 | logLevel | string | `"info"` |  |
 | nameOverride | string | `""` |  |
 | networkPolicy.enabled | bool | `true` |  |
-| networkPolicy.ingressFrom[0].namespaceSelector.matchLabels."kubernetes.io/metadata.name" | string | `"traefik"` |  |
+| networkPolicy.ingressFrom | list | `[]` |  |
 | networkPolicy.metricsFrom | list | `[]` |  |
 | nodeSelector | object | `{}` |  |
 | pdb.enabled | bool | `false` |  |
@@ -64,30 +119,44 @@ NetworkPolicy is enabled by default. It allows ingress from the configured routi
 | podSecurityContext.runAsNonRoot | bool | `true` |  |
 | podSecurityContext.runAsUser | int | `65532` |  |
 | podSecurityContext.seccompProfile.type | string | `"RuntimeDefault"` |  |
+| priorityClassName | string | `""` |  |
 | profiles[0] | string | `"adshield"` |  |
+| readinessProbe.httpGet.path | string | `"/readyz"` |  |
+| readinessProbe.httpGet.port | string | `"ops"` |  |
+| readinessProbe.periodSeconds | int | `5` |  |
 | replicaCount | int | `1` |  |
 | resources.limits.memory | string | `"64Mi"` |  |
 | resources.requests.cpu | string | `"10m"` |  |
 | resources.requests.memory | string | `"32Mi"` |  |
+| revisionHistoryLimit | int | `3` |  |
 | routing.gateway.httpParentRefs | list | `[]` |  |
 | routing.gateway.tlsParentRefs | list | `[]` |  |
 | routing.ingress.annotations | object | `{}` |  |
 | routing.ingress.className | string | `""` |  |
 | routing.mode | string | `"traefik"` |  |
 | routing.traefik.annotations | object | `{}` |  |
+| routing.traefik.certResolver | string | `""` |  |
+| routing.traefik.enrollmentEntryPoints | list | `[]` |  |
 | routing.traefik.entryPoints[0] | string | `"websecure"` |  |
 | securityContext.allowPrivilegeEscalation | bool | `false` |  |
 | securityContext.capabilities.drop[0] | string | `"ALL"` |  |
 | securityContext.readOnlyRootFilesystem | bool | `true` |  |
+| service.ops.annotations | object | `{}` |  |
+| service.ops.labels | object | `{}` |  |
+| service.ops.port | int | `8080` |  |
 | service.sink.annotations | object | `{}` |  |
 | service.sink.externalTrafficPolicy | string | `""` |  |
+| service.sink.labels | object | `{}` |  |
 | service.sink.loadBalancerIP | string | `""` |  |
+| service.sink.port | int | `443` |  |
 | service.sink.type | string | `"ClusterIP"` |  |
 | serviceAccount.create | bool | `true` |  |
 | serviceAccount.name | string | `""` |  |
 | serviceMonitor.enabled | bool | `false` |  |
 | serviceMonitor.interval | string | `"30s"` |  |
 | serviceMonitor.labels | object | `{}` |  |
+| strategy | object | `{}` |  |
+| terminationGracePeriodSeconds | int | `30` |  |
 | tolerations | list | `[]` |  |
 | topologySpreadConstraints | list | `[]` |  |
 | vpa.enabled | bool | `false` |  |

@@ -26,6 +26,11 @@
 {{- fail "routing.mode must be one of traefik, gateway, or ingress" -}}
 {{- end -}}
 {{- $_ := required "pki.existingSecret must name an externally managed Secret" .Values.pki.existingSecret -}}
+{{- range .Values.extraEnv -}}
+{{- if hasPrefix "ARS_PKI_" (default "" .name) -}}
+{{- fail "extraEnv entries must not use names beginning with ARS_PKI_" -}}
+{{- end -}}
+{{- end -}}
 {{- if eq .Values.routing.mode "traefik" -}}
 {{- if not (.Capabilities.APIVersions.Has "traefik.io/v1alpha1") -}}
 {{- fail "routing.mode=traefik requires the traefik.io/v1alpha1 API" -}}
