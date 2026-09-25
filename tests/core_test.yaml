@@ -44,6 +44,9 @@ tests:
       logFormat: text
       toast.enabled: true
       toast.details: true
+      metrics.sites.enabled: true
+      metrics.sites.max: 25
+      metrics.upstreams.max: 50
     capabilities:
       apiVersions:
         - traefik.io/v1alpha1
@@ -72,6 +75,15 @@ tests:
       - equal:
           path: data.ARS_TOAST_DETAILS
           value: "true"
+      - equal:
+          path: data.ARS_METRICS_SITES_ENABLED
+          value: "true"
+      - equal:
+          path: data.ARS_METRICS_SITES_MAX
+          value: "25"
+      - equal:
+          path: data.ARS_METRICS_UPSTREAMS_MAX
+          value: "50"
 
   - it: renders configured addresses in the ConfigMap
     templates:

@@ -1,6 +1,6 @@
 # adblock-recovery-sink-chart
 
-![Version: 0.3.0](https://img.shields.io/badge/Version-0.3.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.2.0](https://img.shields.io/badge/AppVersion-0.2.0-informational?style=flat-square)
+![Version: 0.4.0](https://img.shields.io/badge/Version-0.4.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.3.0](https://img.shields.io/badge/AppVersion-0.3.0-informational?style=flat-square)
 
 Helm chart for [adblock-recovery-sink](https://gitlab.com/ptrck-sh/adblock-recovery-sink), which serves harmless replacements for known anti-adblock loader resources behind DNS rewrites that you manage on your LAN resolver.
 
@@ -15,6 +15,12 @@ The chart mounts no volumes. Application configuration is supplied only through 
 ## Toast
 
 `toast.enabled` appends a small notice to each served loader that appears in the top-right corner when the sink answers the page's handshake. `toast.details` adds the host and path of the neutralized script. Both default to `false`.
+
+## Metrics
+
+`ars_upstream_requests_total` counts every request by requested host, path, and result, so fallback hosts and loader names the profile does not serve yet show up. `metrics.upstreams.max` caps the distinct host and path pairs per pod; the rest are counted as `other`.
+
+`metrics.sites.enabled` adds `ars_site_requests_total`, which counts served loaders by the site in the request's `Referer`. It records which sites your users visit, so it defaults to `false`. `metrics.sites.max` caps the distinct sites per pod.
 
 ## Routing
 
@@ -180,6 +186,9 @@ NetworkPolicy is enabled by default. It allows ingress on the sink and ops ports
 | livenessProbe.httpGet.port | string | `"ops"` |  |
 | logFormat | string | `"json"` |  |
 | logLevel | string | `"info"` |  |
+| metrics.sites.enabled | bool | `false` |  |
+| metrics.sites.max | int | `100` |  |
+| metrics.upstreams.max | int | `200` |  |
 | nameOverride | string | `""` |  |
 | networkPolicy.enabled | bool | `true` |  |
 | networkPolicy.ingressFrom | list | `[]` |  |
